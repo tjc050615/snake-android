@@ -73,3 +73,35 @@ buildozer android deploy run 2>&1 | tee docs/evidence/buildozer-run.log
 - **本环境（Windows + 无 Android SDK/NDK/设备）无法执行 `buildozer android debug`，也无法真机安装与 10 分钟热稳定测试。**
 - 因此：无打包日志片段、无真机截图、无热稳定数据；`m5-pack` **未打**（需要构建成功后才能证明）。
 - 需要在 Linux/WSL2 + Android SDK/NDK 环境执行上面命令，把 `buildozer-debug.log`、`unzip -l` 输出、真机截图 5 张、热稳定数据补进 `docs/evidence/`。
+
+## CI 触发方式
+
+1. 推送到 `main`/`master`，或仓库 Actions 页面手动 `Run workflow`（`android-build.yml`）。
+2. 首次构建约 40~60 分钟；`~/.buildozer` 与 `.buildozer` 已缓存，后续约 10~15 分钟。
+3. 成功后在该次 run 的 **Artifacts** 下载 `snake-debug-apk`（`bin/*.apk`）。
+4. 失败时下载 `buildozer-logs`（含 `buildozer-debug.log`、`apk-contents.txt`、p4a `build.log`）。
+
+CI 内置两条硬校验：
+- `unzip -l "$APK" | grep -E "(^|/)(tests|docs|tools)/"` 必须**无输出**；
+- `NotoSansSC-Regular.otf` 必须存在。
+
+## 本地 / WSL2 构建
+
+```bash
+# WSL2 里先装依赖
+sudo apt install -y openjdk-17-jdk unzip zip autoconf libtool pkg-config   zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
+pip install buildozer==1.5.0 cython==0.29.36
+
+bash scripts/build_android.sh debug
+# 产物：bin/snake-*-debug.apk；日志：docs/evidence/buildozer-debug.log
+```
+
+## adb 安装与真机验证
+
+```bash
+adb devices
+adb install -r bin/snake-*-debug.apk
+adb logcat -s python:* SDL:* | tee docs/evidence/r4-logcat.txt
+```
+
+真机验证按 `docs/R4-DEVICE-CHECKLIST.md` 逐项打勾并回填截图/数据；完成后才能打 `m5-pack`。
