@@ -29,12 +29,16 @@ from app import constants as C
 from app import strings
 from app.fonts import font_name, register_fonts
 from core.chunk_manager import ChunkManager
+from data.crash import CrashGuard
+from data.debounce import DebouncedSaver
+from data.profile import ProfileStore
 from data.storage import ConfigStore
 from core.game import Game
 from core.snake import DIR_DOWN, DIR_LEFT, DIR_RIGHT, DIR_UP, Snake
 from platform_layer import desktop
 from view.game_canvas import GameCanvas
 from view.panel import Panel
+from view.history_panel import HistoryPanel
 from view.settings_panel import SettingsOverlay
 
 DEFAULT_SEED = 20261022
@@ -57,6 +61,7 @@ KEY_RESTART = 114  # r
 class SnakeApp(App):
     title = "Snake — M1/R5"
     smoke_seconds = 0.0
+    _save_event = None
     demo = False
     interp = False
     hyst = False
@@ -70,6 +75,7 @@ class SnakeApp(App):
     ai = False
     clip_demo = False
     settings_shot = False
+    history_shot = False
     theme_override: str | None = None
     font_override: float | None = None
 
@@ -79,6 +85,14 @@ class SnakeApp(App):
         self._apply_window_size()
         self.store = ConfigStore()
         self.cfg = self.store.load()
+        self.saver = DebouncedSaver(self.store)
+        home = os.path.dirname(self.store.path)
+        self.crash = CrashGuard(home)
+        self.crashed_last_time = self.crash.previous_crash()
+        self.crash.start()
+        self.profile_store = ProfileStore(os.path.join(home, "profile.json"))
+        self.profile = self.profile_store.load()
+        self._recorded = False
         if self.theme_override:
             self.cfg["theme"] = self.theme_override
         if self.font_override:
@@ -103,6 +117,7 @@ class SnakeApp(App):
         self.panel = Panel(
             self.game, on_wrap=self._toggle_wrap, on_restart=self._restart,
             on_settings=self._open_settings,
+            on_history=self._open_history,
         )
         self.panel.size_hint = (0.30, 1.0)
         self.panel.pos_hint = {"right": 1, "y": 0}
@@ -152,6 +167,9 @@ class SnakeApp(App):
             if self.settings_shot:
                 Clock.schedule_once(lambda _dt: self._open_settings(), 0.4)
                 Clock.schedule_once(lambda _dt: self._shot("settings"), 1.0)
+            if self.history_shot:
+                Clock.schedule_once(self._setup_history_shot, 0.3)
+                Clock.schedule_once(lambda _dt: self._shot("history"), 1.0)
             if self.clip_demo:
                 Clock.schedule_once(self._setup_clip_scene, 0.2)
                 Clock.schedule_once(lambda _dt: self._shot("clip"), 0.8)
@@ -184,11 +202,101 @@ class SnakeApp(App):
         self.panel.disabled = False
 
     def _on_settings_change(self, cfg: dict) -> None:
-        self.cfg = self.store.save(cfg)
+        self.cfg = dict(cfg)
+        self.saver.request(self.cfg)
+        if self._save_event is not None:
+            self._save_event.cancel()
+        self._save_event = Clock.schedule_once(self._flush_save, 0.5)
         self.canvas_widget.set_theme(self.cfg.get("theme", "dark"))
         self.canvas_widget.apply_view_options(
             self.cfg.get("show_grid", True), self.cfg.get("head_highlight", True)
         )
+
+    def _flush_save(self, _dt=None) -> None:
+        self._save_event = None
+        self.saver.flush()
+
+    def _setup_history_shot(self, _dt: float) -> None:
+        """截图用：塞入几条历史样本再打开历史面板。"""
+        for mode, score, seed, wrap in (
+            ("human", 12, 20261022, False),
+            ("ai", 57, 42, False),
+            ("ai", 88, 7, True),
+        ):
+            self.profile = self.profile_store.record_game(self.profile, {
+                "mode": mode, "duration": 30, "score": score, "seed": seed,
+                "time": 1760000000, "is_ai": mode == "ai", "wrap": wrap,
+            })
+        self._open_history()
+
+    def on_stop(self) -> None:
+        try:
+            self.saver.flush()
+            self.crash.stop()
+        except Exception:  # pragma: no cover
+            pass
+
+    # ---------- 历史 / 种子 ----------
+    def _open_history(self) -> None:
+        if getattr(self, "history_overlay", None) is not None:
+            return
+        self.history_overlay = HistoryPanel(
+            self.profile, self.game.seed,
+            on_apply_seed=self._apply_seed,
+            on_copy_seed=self._copy_seed,
+            on_close=self._close_history,
+        )
+        self.history_overlay.size_hint = (0.30, 1.0)
+        self.history_overlay.pos_hint = {"right": 1, "y": 0}
+        self.root_layout.add_widget(self.history_overlay)
+        self.panel.opacity = 0
+        self.panel.disabled = True
+
+    def _close_history(self) -> None:
+        overlay = getattr(self, "history_overlay", None)
+        if overlay is not None:
+            self.root_layout.remove_widget(overlay)
+            self.history_overlay = None
+        self.panel.opacity = 1
+        self.panel.disabled = False
+
+    def _apply_seed(self, seed: int) -> None:
+        self.game.reset(seed)
+        self.game.clock.set_speed(self.speed)
+        self._recorded = False
+        if self.canvas_widget.camera is not None:
+            self.canvas_widget.camera.reset(self.game.snake.head)
+            self.canvas_widget.viewport = self.canvas_widget.camera.viewport()
+        self.canvas_widget.hide_game_over()
+        self.canvas_widget.rebuild()
+        self._close_history()
+
+    def _copy_seed(self, seed: int) -> None:
+        try:
+            from kivy.core.clipboard import Clipboard
+
+            Clipboard.copy(str(seed))
+        except Exception as exc:  # pragma: no cover
+            Logger.warning("clipboard copy failed: %s", exc)
+
+    def _record_game(self) -> None:
+        if self._recorded:
+            return
+        self._recorded = True
+        entry = {
+            "mode": "ai" if self.session is not None else "human",
+            "duration": round(self.game.ticks / max(1, self.game.clock.base_interval), 1),
+            "score": self.game.score,
+            "seed": self.game.seed,
+            "time": int(__import__("time").time()),
+            "is_ai": self.session is not None,
+            "wrap": self.game.wrap_mode,
+        }
+        self.profile = self.profile_store.record_game(self.profile, entry)
+        try:
+            self.profile_store.save(self.profile)
+        except Exception as exc:  # pragma: no cover
+            Logger.warning("profile save failed: %s", exc)
 
     # ---------- 面板按钮回调 ----------
     def _toggle_wrap(self) -> None:
@@ -232,6 +340,7 @@ class SnakeApp(App):
                 self._rebuilds_after_death += 1
         if summary.died:
             self.canvas_widget.show_game_over(self.game.score)
+            self._record_game()
 
     def _ai_tick(self, game) -> None:
         """每个逻辑 tick 开始前调用：AI 方向写入 game（下一 tick 生效）。"""
@@ -259,6 +368,7 @@ class SnakeApp(App):
     def _restart(self) -> None:
         self.game.reset(self.game.seed)
         self.game.clock.set_speed(self.speed)
+        self._recorded = False
         if self.canvas_widget.camera is not None:
             self.canvas_widget.camera.reset(self.game.snake.head)
             self.canvas_widget.viewport = self.canvas_widget.camera.viewport()

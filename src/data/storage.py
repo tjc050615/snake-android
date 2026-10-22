@@ -76,11 +76,16 @@ def validate(raw: dict) -> dict:
     return cfg
 
 
+def home_dir() -> str:
+    """数据目录：优先环境变量 SNAKE_HOME（测试/沙箱），否则用户私有目录。"""
+    return os.environ.get("SNAKE_HOME") or os.path.join(os.path.expanduser("~"), ".snake_android")
+
+
 class ConfigStore:
     """config.json 读写。路径注入便于测试（tmp_path）。"""
 
     def __init__(self, path: str | None = None) -> None:
-        self.path = path or os.path.join(os.path.expanduser("~"), ".snake_android", "config.json")
+        self.path = path or os.path.join(home_dir(), "config.json")
 
     # ---------- 读 ----------
     def load(self) -> dict:

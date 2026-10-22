@@ -112,10 +112,13 @@ def _has_cjk(text: str) -> bool:
     return any("\u4e00" <= ch <= "\u9fff" for ch in text)
 
 
-def test_no_hardcoded_cn():
-    """除 strings.py 外，源码里不允许出现中文 UI 字面量（docstring 除外）。"""
+def find_hardcoded_cn(paths):
+    """扫描范围：只扫 src/**.py；排除 strings.py 与 docstring；不扫 tests/tools/docs。
+
+    f-string 里的中文常量（JoinedStr 的 Constant 片段）同样会被 ast.walk 命中。
+    """
     offenders = []
-    for path in _iter_src():
+    for path in paths:
         if path.endswith(os.path.join("app", "strings.py")):
             continue
         tree = ast.parse(open(path, encoding="utf-8").read())
@@ -132,7 +135,20 @@ def test_no_hardcoded_cn():
                     continue
                 if _has_cjk(node.value):
                     offenders.append((os.path.basename(path), node.lineno, node.value[:20]))
+    return offenders
+
+
+def test_no_hardcoded_cn():
+    """除 strings.py 外，源码里不允许出现中文 UI 字面量（docstring 除外）。"""
+    offenders = find_hardcoded_cn(list(_iter_src()))
     assert not offenders, f"发现硬编码中文：{offenders}"
+
+
+def test_no_hardcoded_cn_detects_fstring(tmp_path):
+    sample = tmp_path / "sample.py"
+    sample.write_text('x = f"得分 {1}"\n', encoding="utf-8")
+    offenders = find_hardcoded_cn([str(sample)])
+    assert offenders and "得分" in offenders[0][2]
 
 
 def test_font_mix_render():

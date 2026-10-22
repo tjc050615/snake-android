@@ -88,6 +88,7 @@ def main() -> int:
     app.ai = "--ai" in sys.argv
     app.clip_demo = "--clipdemo" in sys.argv
     app.settings_shot = "--settings" in sys.argv
+    app.history_shot = "--history" in sys.argv
     for _arg in sys.argv:
         if _arg.startswith("--theme="):
             app.theme_override = _arg.split("=", 1)[1]
