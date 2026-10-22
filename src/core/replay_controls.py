@@ -5,6 +5,11 @@ from __future__ import annotations
 SPEEDS = (0.5, 1.0, 2.0, 4.0)
 
 
+def blocks_input(replay_mode: bool, confirm_active: bool) -> bool:
+    """回放态与确认态都屏蔽全部输入源（键盘/摇杆/滑动/面板按钮）。"""
+    return bool(replay_mode or confirm_active)
+
+
 class ReplayControls:
     def __init__(self, total_ticks: int, speed_index: int = 1) -> None:
         self.total = max(0, int(total_ticks))

@@ -59,16 +59,6 @@ def test_confirm_dialog_blocks_gameplay():
 
 
 # ---------- 常亮持久化 ----------
-def test_screen_awake_setting_persisted(tmp_path):
-    path = str(tmp_path / "config.json")
-    store = ConfigStore(path)
-    cfg = store.load()
-    assert cfg["screen_awake"] is True
-    cfg["screen_awake"] = False
-    store.save(cfg)
-    assert ConfigStore(path).load()["screen_awake"] is False
-
-
 # ---------- 统计面板字段 ----------
 def test_stats_panel_fields():
     session = AISession()

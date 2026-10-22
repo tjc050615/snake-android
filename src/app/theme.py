@@ -14,6 +14,9 @@ DARK = {
     "dead_tint": (0.45, 0.06, 0.10, 0.45),
     "panel_bg": (0.11, 0.12, 0.15, 1),
     "text": (0.92, 0.93, 0.95, 1),
+    "button_bg": (0.22, 0.24, 0.29, 1),
+    "button_text": (0.95, 0.96, 0.98, 1),
+    "accent": (0.25, 0.68, 0.95, 1),
 }
 
 LIGHT = {
@@ -28,6 +31,9 @@ LIGHT = {
     "dead_tint": (0.75, 0.15, 0.20, 0.35),
     "panel_bg": (0.88, 0.89, 0.92, 1),
     "text": (0.10, 0.11, 0.13, 1),
+    "button_bg": (0.80, 0.82, 0.86, 1),
+    "button_text": (0.08, 0.09, 0.11, 1),
+    "accent": (0.10, 0.45, 0.85, 1),
 }
 
 HIGH_CONTRAST = {
@@ -42,6 +48,9 @@ HIGH_CONTRAST = {
     "dead_tint": (0.6, 0.0, 0.0, 0.45),
     "panel_bg": (0.02, 0.02, 0.02, 1),
     "text": (1.0, 1.0, 1.0, 1),
+    "button_bg": (0.15, 0.15, 0.15, 1),
+    "button_text": (1.0, 1.0, 0.0, 1),
+    "accent": (1.0, 0.85, 0.0, 1),
 }
 
 THEMES = {"dark": DARK, "light": LIGHT, "high_contrast": HIGH_CONTRAST}

@@ -93,6 +93,10 @@ def main() -> int:
     app.onboard_shot = "--onboard" in sys.argv
     app.pause_shot = "--pause" in sys.argv
     app.replay_shot = "--replay" in sys.argv
+    app.stats_shot = "--stats" in sys.argv
+    app.debug_shot = "--debug" in sys.argv
+    app.replayui_shot = "--replayui" in sys.argv
+    app.confirm_shot = "--confirmdemo" in sys.argv
     for _arg in sys.argv:
         if _arg.startswith("--theme="):
             app.theme_override = _arg.split("=", 1)[1]

@@ -9,11 +9,13 @@ from kivy.uix.progressbar import ProgressBar
 
 from app import strings
 from app.fonts import FONT_NAME
+from app.theme import palette
+from view.themed import ThemedMixin
 from data.achievements import ACHIEVEMENTS, label, progress
 from data.onboarding import STEPS
 
 
-class AchievementPanel(BoxLayout):
+class AchievementPanel(ThemedMixin, BoxLayout):
     def __init__(self, profile, stats, on_close=None, **kw) -> None:
         super().__init__(orientation="vertical", padding=10, spacing=6, **kw)
         self._on_close = on_close
@@ -36,9 +38,10 @@ class AchievementPanel(BoxLayout):
             bar = ProgressBar(max=target, value=current, size_hint_y=None, height=10)
             row.add_widget(bar)
             self.add_widget(row)
+        self.apply_theme(palette("dark"))
 
 
-class OnboardingPanel(BoxLayout):
+class OnboardingPanel(ThemedMixin, BoxLayout):
     def __init__(self, on_finish=None, **kw) -> None:
         super().__init__(orientation="vertical", padding=12, spacing=8, **kw)
         self.step = 0
@@ -53,6 +56,7 @@ class OnboardingPanel(BoxLayout):
         self.add_widget(self.lbl_body)
         self.add_widget(self.btn_next)
         self._render()
+        self.apply_theme(palette("dark"))
 
     def _render(self) -> None:
         keys = ("onboarding_step1", "onboarding_step2", "onboarding_step3")

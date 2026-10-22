@@ -62,6 +62,13 @@ ZH = {
     "ach_wrap_food_100": "穿墙单局吃 100 食物",
     "ach_play_1h": "累计 1 小时",
     "ach_daily_10": "单日 10 局",
+    "confirm": "确认",
+    "cancel": "取消",
+    "quit_confirm": "确定要退出吗？",
+    "play_pause": "暂停",
+    "resume": "继续",
+    "playing": "播放中",
+    "debug": "调试",
 }
 
 EN = {
@@ -122,6 +129,13 @@ EN = {
     "ach_wrap_food_100": "Wrap mode: 100 food in one run",
     "ach_play_1h": "Play 1 hour total",
     "ach_daily_10": "10 games in one day",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "quit_confirm": "Quit this run?",
+    "play_pause": "Pause",
+    "resume": "Resume",
+    "playing": "Playing",
+    "debug": "Debug",
 }
 
 STRINGS: dict[str, dict[str, str]] = {"zh": ZH, "en": EN}

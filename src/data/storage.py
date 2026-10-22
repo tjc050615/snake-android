@@ -26,7 +26,6 @@ DEFAULTS: dict = {
     "head_highlight": True,
     "show_grid": True,
     "font_size": 16.0,
-    "screen_awake": True,
 }
 
 THEMES = ("dark", "light", "high_contrast")
@@ -54,7 +53,7 @@ def validate(raw: dict) -> dict:
     if raw.get("version") != CONFIG_VERSION:
         return cfg  # 版本不符：直接默认（V1 没有迁移需求）
 
-    for key in ("sound_on", "vibrate_on", "show_fps", "head_highlight", "show_grid", "screen_awake"):
+    for key in ("sound_on", "vibrate_on", "show_fps", "head_highlight", "show_grid"):
         if key in raw:
             cfg[key] = bool(raw[key])
 
@@ -89,6 +88,27 @@ class ConfigStore:
         self.path = path or os.path.join(home_dir(), "config.json")
 
     # ---------- 读 ----------
+    def load_with_legacy(self) -> tuple[dict, bool | None]:
+        """迁移用：返回 (config, 旧版 config 里的 screen_awake)。
+
+        幂等：迁移后字段被删除，下次返回 None，不再动作。
+        """
+        try:
+            with open(self.path, encoding="utf-8") as fh:
+                raw = json.load(fh)
+        except (OSError, ValueError):
+            return default_config(), None
+        legacy = None
+        if isinstance(raw, dict) and "screen_awake" in raw:
+            legacy = bool(raw.pop("screen_awake"))
+            cfg = validate(raw)
+            try:
+                self.save(cfg)  # 写回即删除旧字段
+            except OSError:
+                pass
+            return cfg, legacy
+        return validate(raw), None
+
     def load(self) -> dict:
         try:
             with open(self.path, encoding="utf-8") as fh:

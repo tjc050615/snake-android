@@ -9,10 +9,12 @@ from kivy.uix.label import Label
 
 from app import strings
 from app.fonts import FONT_NAME
+from app.theme import palette
+from view.themed import ThemedMixin
 from data.ai_stats import FIELDS
 
 
-class StatsPanel(BoxLayout):
+class StatsPanel(ThemedMixin, BoxLayout):
     def __init__(self, session, on_close=None, **kw) -> None:
         super().__init__(orientation="vertical", padding=10, spacing=4, **kw)
         self.session = session
@@ -34,6 +36,7 @@ class StatsPanel(BoxLayout):
 
         self._event = Clock.schedule_interval(self.refresh, 0.5)  # 2Hz
         self.refresh()
+        self.apply_theme(palette("dark"))
 
     def refresh(self, _dt=None) -> None:
         stats = getattr(self.session, "stats", {}) if self.session is not None else {}

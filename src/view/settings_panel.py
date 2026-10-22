@@ -19,6 +19,8 @@ from kivy.uix.checkbox import CheckBox
 
 from app import strings
 from app.fonts import FONT_NAME
+from app.theme import palette
+from view.themed import ThemedMixin
 from core.layout import content_height
 from data.storage import PERF_MODES, THEMES
 
@@ -41,14 +43,17 @@ LABEL_KEY = {
 }
 
 
-class SettingsOverlay(BoxLayout):
+class SettingsOverlay(ThemedMixin, BoxLayout):
     """右侧设置面板（覆盖层，与 GameCanvas 同级）。"""
 
-    def __init__(self, cfg: dict, on_change, on_close=None, **kwargs) -> None:
+    def __init__(self, cfg: dict, on_change, on_close=None, screen_awake: bool = True,
+                 on_screen_awake=None, **kwargs) -> None:
         super().__init__(orientation="vertical", padding=10, spacing=6, **kwargs)
         self.cfg = dict(cfg)
         self._on_change = on_change
         self._on_close = on_close
+        self._screen_awake = bool(screen_awake)
+        self._on_screen_awake = on_screen_awake
         self._rows = 0
 
         header = BoxLayout(size_hint_y=None, height=44, spacing=6)
@@ -67,6 +72,7 @@ class SettingsOverlay(BoxLayout):
 
         self._build_rows()
         self._refresh_content_height()
+        self.apply_theme(palette("dark"))
 
     # ---------- 工具 ----------
     def _fs(self, base: float) -> float:
@@ -102,6 +108,18 @@ class SettingsOverlay(BoxLayout):
         s = Slider(min=lo, max=hi, value=float(self.cfg.get(key, lo)))
         s.bind(value=lambda _w, v, k=key: self._set(k, round(float(v), 2)))
         row.add_widget(s)
+
+    def _screen_awake_row(self) -> None:
+        """屏幕常亮：状态存 profile（不是 config），实际效果 M5 用 pyjnius。"""
+        row = self._row("screen_awake")
+        cb = CheckBox(active=self._screen_awake)
+        cb.bind(active=lambda _w, v: self._set_screen_awake(bool(v)))
+        row.add_widget(cb)
+
+    def _set_screen_awake(self, value: bool) -> None:
+        self._screen_awake = value
+        if self._on_screen_awake is not None:
+            self._on_screen_awake(value)
 
     def _choice_row(self, key: str, values, label_map) -> None:
         row = self._row(key)
@@ -140,7 +158,7 @@ class SettingsOverlay(BoxLayout):
         self._slider_row("joystick_deadzone", 0.05, 0.5)
         self._switch_row("head_highlight")
         self._switch_row("show_grid")
-        self._switch_row("screen_awake")
+        self._screen_awake_row()
         self._slider_row("font_size", 12.0, 24.0)
 
         btn = Button(text=strings.t("reset_defaults"), font_name=FONT_NAME, font_size=self._fs(15),

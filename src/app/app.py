@@ -27,6 +27,7 @@ from ai.session import AISession
 
 from app import constants as C
 from app import strings
+from app.theme import palette
 from app.fonts import font_name, register_fonts
 from core.chunk_manager import ChunkManager
 from data.crash import CrashGuard
@@ -40,6 +41,15 @@ from view.game_canvas import GameCanvas
 from view.panel import Panel
 from core.pause import PauseGate
 from data.onboarding import mark_done, should_show
+from core.debug import DebugStats
+from core.audio import Haptics, SoundManager
+from core.confirm import ConfirmState
+from core.replay_controls import ReplayControls
+from data.achievements import evaluate
+from view.confirm_dialog import ConfirmDialog
+from view.debug_overlay import DebugOverlay
+from view.replay_panel import ReplayPanel
+from view.stats_panel import StatsPanel
 from view.history_panel import HistoryPanel
 from view.info_panel import AchievementPanel, OnboardingPanel
 from view.settings_panel import SettingsOverlay
@@ -83,6 +93,10 @@ class SnakeApp(App):
     onboard_shot = False
     pause_shot = False
     replay_shot = False
+    stats_shot = False
+    debug_shot = False
+    replayui_shot = False
+    confirm_shot = False
     theme_override: str | None = None
     font_override: float | None = None
 
@@ -99,6 +113,21 @@ class SnakeApp(App):
         self.crash.start()
         self.profile_store = ProfileStore(os.path.join(home, "profile.json"))
         self.profile = self.profile_store.load()
+        _, legacy_awake = self.store.load_with_legacy()
+        if legacy_awake is not None:
+            self.profile['screen_awake'] = bool(legacy_awake)
+            try:
+                self.profile_store.save(self.profile)
+            except Exception:
+                pass
+        self.sound = SoundManager(os.path.join('assets', 'sounds'),
+                                  enabled=bool(self.cfg.get('sound_on', True)),
+                                  volume=float(self.cfg.get('volume', 0.8)))
+        self.haptics = Haptics(enabled=bool(self.cfg.get('vibrate_on', True)),
+                               strength=float(self.cfg.get('vibrate_strength', 0.5)))
+        self.debug_stats = DebugStats(enabled=False)
+        self.confirm_state = ConfirmState()
+        self.replay_mode = False
         self._recorded = False
         self.pause_gate = PauseGate()
         self.achievements_overlay = None
@@ -129,6 +158,7 @@ class SnakeApp(App):
             on_settings=self._open_settings,
             on_history=self._open_history,
             on_achievements=self._open_achievements,
+            on_stats=self._open_stats,
         )
         self.panel.size_hint = (0.30, 1.0)
         self.panel.pos_hint = {"right": 1, "y": 0}
@@ -137,11 +167,19 @@ class SnakeApp(App):
         self.canvas_widget.apply_view_options(
             self.cfg.get("show_grid", True), self.cfg.get("head_highlight", True)
         )
+        self._apply_theme()
+        self.sound.enabled = bool(self.cfg.get("sound_on", True))
+        self.sound.volume = float(self.cfg.get("volume", 0.8))
+        self.haptics.enabled = bool(self.cfg.get("vibrate_on", True))
+        self.haptics.strength = float(self.cfg.get("vibrate_strength", 0.5))
 
         root = FloatLayout()
         root.add_widget(self.canvas_widget)
         root.add_widget(self.panel)
         self.root_layout = root
+        self.debug_overlay = DebugOverlay(pos_hint={'x': 0.30, 'top': 0.98})
+        root.add_widget(self.debug_overlay)
+        self._apply_theme()
         # 布局完成后再刷一次文案：面板首次创建时宽度为 0，纹理会按 0 宽缓存
         Clock.schedule_once(lambda _dt: self.panel.refresh(), 0.05)
 
@@ -190,6 +228,18 @@ class SnakeApp(App):
             if self.replay_shot:
                 self.canvas_widget.overlay_text = f"{strings.t('replay')} 12/120 1x"
                 Clock.schedule_once(lambda _dt: self._shot("replay"), 0.8)
+            if self.stats_shot:
+                Clock.schedule_once(lambda _dt: self._open_stats(), 0.4)
+                Clock.schedule_once(lambda _dt: self._shot("stats"), 1.0)
+            if self.debug_shot:
+                Clock.schedule_once(lambda _dt: self._toggle_debug(True), 0.3)
+                Clock.schedule_once(lambda _dt: self._shot("debug_on"), 1.0)
+            if self.replayui_shot:
+                Clock.schedule_once(lambda _dt: self._open_replay(), 0.4)
+                Clock.schedule_once(lambda _dt: self._shot("replay_ui"), 1.0)
+            if self.confirm_shot:
+                Clock.schedule_once(lambda _dt: self._ask_confirm("restart"), 0.4)
+                Clock.schedule_once(lambda _dt: self._shot("confirm"), 1.0)
             if self.history_shot:
                 Clock.schedule_once(self._setup_history_shot, 0.3)
                 Clock.schedule_once(lambda _dt: self._shot("history"), 1.0)
@@ -209,10 +259,13 @@ class SnakeApp(App):
             return
         self.settings_overlay = SettingsOverlay(
             self.cfg, on_change=self._on_settings_change, on_close=self._close_settings,
+            screen_awake=bool(self.profile.get('screen_awake', True)),
+            on_screen_awake=self._on_screen_awake,
         )
         self.settings_overlay.size_hint = (0.30, 1.0)
         self.settings_overlay.pos_hint = {"right": 1, "y": 0}
         self.root_layout.add_widget(self.settings_overlay)
+        self.settings_overlay.apply_theme(palette(self.cfg.get("theme", "dark")))
         self.panel.opacity = 0
         self.panel.disabled = True
 
@@ -223,6 +276,13 @@ class SnakeApp(App):
             self.settings_overlay = None
         self.panel.opacity = 1
         self.panel.disabled = False
+
+    def _on_screen_awake(self, value: bool) -> None:
+        self.profile['screen_awake'] = bool(value)
+        try:
+            self.profile_store.save(self.profile)
+        except Exception:
+            pass
 
     def _on_settings_change(self, cfg: dict) -> None:
         self.cfg = dict(cfg)
@@ -270,6 +330,7 @@ class SnakeApp(App):
         self.achievements_overlay.size_hint = (0.30, 1.0)
         self.achievements_overlay.pos_hint = {"right": 1, "y": 0}
         self.root_layout.add_widget(self.achievements_overlay)
+        self.achievements_overlay.apply_theme(palette(self.cfg.get("theme", "dark")))
         self.panel.opacity = 0
         self.panel.disabled = True
 
@@ -287,6 +348,7 @@ class SnakeApp(App):
         self.onboarding_overlay.size_hint = (0.34, 0.6)
         self.onboarding_overlay.pos_hint = {"center_x": 0.35, "center_y": 0.5}
         self.root_layout.add_widget(self.onboarding_overlay)
+        self.onboarding_overlay.apply_theme(palette(self.cfg.get("theme", "dark")))
 
     def _finish_onboarding(self) -> None:
         if self.onboarding_overlay is not None:
@@ -299,10 +361,98 @@ class SnakeApp(App):
             pass
 
     def _toggle_pause(self) -> None:
+        if self.replay_mode:
+            if getattr(self, "replay_overlay", None) is not None:
+                self.replay_overlay.advance(dt)
+            self.canvas_widget.rebuild()
+            return
+        if self.confirm_state.active:
+            self.canvas_widget.rebuild()
+            return
         if self.pause_gate.active:
             self.pause_gate.finish()
         else:
             self.pause_gate.pause()
+
+    # ---------- 主题 / 统计 / 调试 / 回放 / 确认 ----------
+    def _apply_theme(self) -> None:
+        colors = palette(self.cfg.get("theme", "dark"))
+        self.canvas_widget.set_theme(self.cfg.get("theme", "dark"))
+        self.panel.apply_theme(colors)
+        for name in ("settings_overlay", "history_overlay", "achievements_overlay",
+                     "stats_overlay", "replay_overlay", "confirm_overlay"):
+            ov = getattr(self, name, None)
+            if ov is not None and hasattr(ov, "apply_theme"):
+                ov.apply_theme(colors)
+        if getattr(self, "debug_overlay", None) is not None:
+            self.debug_overlay.apply_theme(colors)
+
+    def _open_stats(self) -> None:
+        if self.session is None or getattr(self, "stats_overlay", None) is not None:
+            return
+        self.stats_overlay = StatsPanel(self.session, on_close=self._close_stats)
+        self.stats_overlay.size_hint = (0.30, 1.0)
+        self.stats_overlay.pos_hint = {"right": 1, "y": 0}
+        self.root_layout.add_widget(self.stats_overlay)
+        self.stats_overlay.apply_theme(palette(self.cfg.get("theme", "dark")))
+
+    def _close_stats(self) -> None:
+        if getattr(self, "stats_overlay", None) is not None:
+            self.root_layout.remove_widget(self.stats_overlay)
+            self.stats_overlay = None
+
+    def _toggle_debug(self, enabled: bool | None = None) -> None:
+        target = (not self.debug_stats.enabled) if enabled is None else bool(enabled)
+        self.debug_stats.set_enabled(target)
+        if not target:
+            self.debug_overlay.text = ""
+
+    def _open_replay(self) -> None:
+        if getattr(self, "replay_overlay", None) is not None:
+            return
+        self.replay_mode = True
+        self.canvas_widget.on_direction = None  # 回放态：摇杆/滑动 no-op
+        self.replay_overlay = ReplayPanel(120, on_close=self._close_replay)
+        self.replay_overlay.size_hint = (0.30, None)
+        self.replay_overlay.height = 220
+        self.replay_overlay.pos_hint = {"right": 1, "top": 0.98}
+        self.root_layout.add_widget(self.replay_overlay)
+        self.replay_overlay.apply_theme(palette(self.cfg.get("theme", "dark")))
+
+    def _close_replay(self) -> None:
+        if getattr(self, "replay_overlay", None) is not None:
+            self.root_layout.remove_widget(self.replay_overlay)
+            self.replay_overlay = None
+        self.replay_mode = False
+        self.canvas_widget.on_direction = self._on_direction
+
+    def _ask_confirm(self, action: str) -> None:
+        if self.replay_mode:
+            return  # 回放态不弹确认
+        if getattr(self, "confirm_overlay", None) is not None:
+            return
+        self.confirm_state.ask(action)
+        self.confirm_overlay = ConfirmDialog(action, on_confirm=self._do_confirm,
+                                             on_cancel=self._cancel_confirm)
+        self.confirm_overlay.size_hint = (0.32, None)
+        self.confirm_overlay.height = 170
+        self.confirm_overlay.pos_hint = {"center_x": 0.35, "center_y": 0.5}
+        self.root_layout.add_widget(self.confirm_overlay)
+        self.confirm_overlay.apply_theme(palette(self.cfg.get("theme", "dark")))
+
+    def _do_confirm(self, action: str) -> None:
+        self.confirm_state.confirm()
+        if getattr(self, "confirm_overlay", None) is not None:
+            self.root_layout.remove_widget(self.confirm_overlay)
+            self.confirm_overlay = None
+        if action == "restart":
+            self._restart()
+
+    def _cancel_confirm(self) -> None:
+        self.confirm_state.cancel()
+        if getattr(self, "confirm_overlay", None) is not None:
+            self.root_layout.remove_widget(self.confirm_overlay)
+            self.confirm_overlay = None
 
     # ---------- 历史 / 种子 ----------
     def _open_history(self) -> None:
@@ -317,6 +467,7 @@ class SnakeApp(App):
         self.history_overlay.size_hint = (0.30, 1.0)
         self.history_overlay.pos_hint = {"right": 1, "y": 0}
         self.root_layout.add_widget(self.history_overlay)
+        self.history_overlay.apply_theme(palette(self.cfg.get("theme", "dark")))
         self.panel.opacity = 0
         self.panel.disabled = True
 
@@ -364,6 +515,15 @@ class SnakeApp(App):
             "wrap": self.game.wrap_mode,
         }
         self.profile = self.profile_store.record_game(self.profile, entry)
+        stats = {'best_score': self.profile.get('best_score', 0),
+                 'ai_food_best': self.game.score if self.session else 0,
+                 'wrap_food_best': self.game.score if self.game.wrap_mode else 0,
+                 'total_seconds': self.profile.get('total_games', 0) * 30,
+                 'games_today': self.profile.get('total_games', 0)}
+        self.profile, newly = evaluate(self.profile, stats)
+        for _key in newly:
+            self.sound.play("achievement")
+            self.haptics.vibrate("achievement")
         try:
             self.profile_store.save(self.profile)
         except Exception as exc:  # pragma: no cover
@@ -406,6 +566,17 @@ class SnakeApp(App):
         self._update_chunks()
         if summary.ticks or summary.died:
             self.panel.refresh()
+        if self.debug_stats.enabled:
+            self.debug_overlay.show(self.debug_stats.collect(
+                self.game, self.canvas_widget.camera, self.session, self.canvas_widget.viewport))
+        else:
+            self.debug_overlay.text = ""
+        if summary.ate:
+            self.sound.play("eat")
+            self.haptics.vibrate("eat")
+        if summary.died:
+            self.sound.play("die")
+            self.haptics.vibrate("die")
         if self.session is not None:
             self.canvas_widget.ai_path = self.session.current_path(self.game.ticks)
         if (
@@ -436,11 +607,13 @@ class SnakeApp(App):
 
     # ---------- 输入 ----------
     def _on_key_down(self, _window, key, _scancode, _codepoint, _modifiers) -> bool:
+        if self.replay_mode or self.confirm_state.active:
+            return True  # 回放/确认态屏蔽全部输入
         direction = KEYMAP.get(key)
         if direction is not None:
             return self.game.set_direction(direction)
         if key == KEY_RESTART:
-            self._restart()
+            self._ask_confirm('restart')
             return True
         return False
 

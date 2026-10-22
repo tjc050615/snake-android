@@ -10,9 +10,11 @@ from kivy.uix.textinput import TextInput
 
 from app import strings
 from app.fonts import FONT_NAME
+from app.theme import palette
+from view.themed import ThemedMixin
 
 
-class HistoryPanel(BoxLayout):
+class HistoryPanel(ThemedMixin, BoxLayout):
     def __init__(self, profile: dict, current_seed: int, on_apply_seed, on_copy_seed, on_close=None, **kw) -> None:
         super().__init__(orientation="vertical", padding=10, spacing=6, **kw)
         self.profile = profile
@@ -59,6 +61,7 @@ class HistoryPanel(BoxLayout):
         self.add_widget(scroll)
 
         self._render_history()
+        self.apply_theme(palette("dark"))
 
     # ---------- 列表 ----------
     def _render_history(self) -> None:
