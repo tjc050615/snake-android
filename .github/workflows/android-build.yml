@@ -24,7 +24,7 @@ jobs:
           sudo apt-get install -y \
             git zip unzip openjdk-17-jdk python3-pip autoconf libtool \
             pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev \
-            libtinfo5 cmake libffi-dev libssl-dev aidl
+            libtinfo5 cmake libffi-dev libssl-dev aidl wget
 
       - name: Cache buildozer + SDK/NDK
         uses: actions/cache@v4
@@ -50,10 +50,27 @@ jobs:
           echo "====== 确认 Java 版本 ======"
           java -version
           
+          echo "====== 修复 SDK 路径 (伪造 sdkmanager) ======"
+          SDK_DIR="$HOME/.buildozer/android/platform/android-sdk"
+          mkdir -p "$SDK_DIR"
+          
+          # 下载最新的 cmdline-tools
+          if [ ! -d "$SDK_DIR/cmdline-tools" ]; then
+            wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
+            unzip -q cmdline-tools.zip -d "$SDK_DIR"
+          fi
+          
+          # 将新版 sdkmanager 复制到它死板寻找的旧目录
+          mkdir -p "$SDK_DIR/tools/bin"
+          if [ -d "$SDK_DIR/cmdline-tools/bin" ]; then
+            cp -r "$SDK_DIR/cmdline-tools/bin/"* "$SDK_DIR/tools/bin/" || true
+            cp -r "$SDK_DIR/cmdline-tools/lib" "$SDK_DIR/tools/" || true
+          fi
+          
           echo "====== 修复 aidl ======"
           for v in 35.0.0 34.0.0 33.0.0 32.0.0 31.0.0 30.0.3 29.0.3; do
-            mkdir -p ~/.buildozer/android/platform/android-sdk/build-tools/$v
-            sudo ln -sf /usr/bin/aidl ~/.buildozer/android/platform/android-sdk/build-tools/$v/aidl
+            mkdir -p "$SDK_DIR/build-tools/$v"
+            sudo ln -sf /usr/bin/aidl "$SDK_DIR/build-tools/$v/aidl"
           done
           
           echo "====== 开始打包 ======"
