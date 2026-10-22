@@ -24,7 +24,7 @@ jobs:
           sudo apt-get install -y \
             git zip unzip openjdk-17-jdk python3-pip autoconf libtool \
             pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev \
-            libtinfo5 cmake libffi-dev libssl-dev aidl
+            libtinfo5 cmake libffi-dev libssl-dev aidl wget
 
       - name: Cache buildozer + SDK/NDK
         uses: actions/cache@v4
@@ -42,11 +42,31 @@ jobs:
       - name: Build debug APK
         run: |
           set -o pipefail
-          # 暴力修复：给 Buildozer 自己的 SDK 目录里塞入 aidl
+          
+          echo "====== 开始修复 SDK 路径 ======"
+          SDK_DIR="$HOME/.buildozer/android/platform/android-sdk"
+          mkdir -p "$SDK_DIR"
+          
+          # 下载并解压最新的 cmdline-tools
+          if [ ! -d "$SDK_DIR/cmdline-tools" ]; then
+            wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
+            unzip -q cmdline-tools.zip -d "$SDK_DIR"
+          fi
+          
+          # 伪造旧路径 tools/bin/sdkmanager
+          mkdir -p "$SDK_DIR/tools/bin"
+          if [ -d "$SDK_DIR/cmdline-tools/bin" ]; then
+            cp -r "$SDK_DIR/cmdline-tools/bin/"* "$SDK_DIR/tools/bin/" || true
+            cp -r "$SDK_DIR/cmdline-tools/lib" "$SDK_DIR/tools/" || true
+          fi
+          
+          echo "====== 开始修复 aidl ======"
           for v in 35.0.0 34.0.0 33.0.0 32.0.0 31.0.0 30.0.3 29.0.3; do
-            mkdir -p ~/.buildozer/android/platform/android-sdk/build-tools/$v
-            sudo ln -sf /usr/bin/aidl ~/.buildozer/android/platform/android-sdk/build-tools/$v/aidl
+            mkdir -p "$SDK_DIR/build-tools/$v"
+            sudo ln -sf /usr/bin/aidl "$SDK_DIR/build-tools/$v/aidl"
           done
+          
+          echo "====== 开始打包 ======"
           buildozer -v android debug 2>&1 | tee buildozer-debug.log
 
       - name: Verify APK packaging rules
