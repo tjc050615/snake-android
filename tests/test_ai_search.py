@@ -185,7 +185,7 @@ def test_fallback_direction_is_deterministic_order():
 
 def test_fallback_picks_first_available_in_order():
     """上被挡、右被挡 → 必须返回"下"，而不是随便挑一个安全方向。"""
-    from core.snake import Snake as S
+    from core.snake import DIR_RIGHT, Snake as S
 
     world = World(9)
     world.ensure_chunk(0, 0)
