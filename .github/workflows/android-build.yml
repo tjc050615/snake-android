@@ -42,6 +42,11 @@ jobs:
       - name: Build debug APK
         run: |
           set -o pipefail
+          # 暴力修复：给 Buildozer 自己的 SDK 目录里塞入 aidl
+          for v in 35.0.0 34.0.0 33.0.0 32.0.0 31.0.0 30.0.3 29.0.3; do
+            mkdir -p ~/.buildozer/android/platform/android-sdk/build-tools/$v
+            sudo ln -sf /usr/bin/aidl ~/.buildozer/android/platform/android-sdk/build-tools/$v/aidl
+          done
           buildozer -v android debug 2>&1 | tee buildozer-debug.log
 
       - name: Verify APK packaging rules
