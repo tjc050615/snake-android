@@ -50,7 +50,8 @@ class AISession:
             "follow_tail": 0,
             "loop_guard": 0,
             "timeouts": 0,
-            "reuse": 0,
+            "no_decision_reuse": 0,
+            "reuse": 0,  # 兼容别名，与 no_decision_reuse 同值
             "emergency": 0,
             "stale_direction": 0,
         }
@@ -84,7 +85,8 @@ class AISession:
 
         if direction is None:
             direction = self._reuse(world, snake, wrap_mode)
-            self.stats["reuse"] += 1
+            self.stats["no_decision_reuse"] += 1
+            self.stats["reuse"] = self.stats["no_decision_reuse"]
 
         if direction is not None:
             self.last_direction = direction

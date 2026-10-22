@@ -18,6 +18,7 @@ from app.fonts import font_name
 from core.camera import Camera
 from core.game import Game
 from core.interp import segment_cells, to_pixel
+from core.joystick import Joystick
 from core.scale import fit_grid_size
 from core.viewport import Viewport
 from platform_layer import desktop
@@ -42,7 +43,10 @@ class GameCanvas(Widget):
         self.too_small = False
         self._resize_event: ClockEvent | None = None
         self.ai_path: list[tuple[int, int]] = []  # M3：AI 路径（半透明折线）
-        self.wrap_rect = (0.0, 0.0, 0.0, 0.0)  # HUD 穿墙开关的可点击矩形
+        self._joystick = Joystick()
+        self.joy_radius = 90.0
+        self.on_direction = None          # 回调：direction -> None
+        self._touch_uid = None
         self._status_text = ""
 
         self.bind(size=self._on_resize)
@@ -249,24 +253,49 @@ class GameCanvas(Widget):
             if self._status_text:
                 self._draw_status_text()
 
-            self._draw_hud()
+            self._draw_joystick()
 
-    def _draw_hud(self) -> None:
-        """左上角穿墙开关：CoreLabel 纹理绘制（Button 的中文渲染不出字形）。"""
-        text = strings.t("wrap_on" if self.game.wrap_mode else "wrap_off")
-        label = CoreLabel(
-            text=text,
-            font_size=22,
-            font_name=font_name() or "Roboto",
-            color=(1, 1, 1, 1),
-        )
-        label.refresh()
-        tex = label.texture
-        pad = 8
-        w, h = tex.width + pad * 2, tex.height + pad * 2
-        x, y = 12.0, self.height - h - 12.0
-        self.wrap_rect = (x, y, w, h)
-        Color(0.20, 0.22, 0.26, 1)
-        Rectangle(pos=(x, y), size=(w, h))
-        Color(1, 1, 1, 1)
-        Rectangle(texture=tex, size=tex.size, pos=(x + pad, y + pad))
+    # ---------- 触控（M4/R1）：游戏区内摇杆/滑动，面板区由 Panel 自己消费 ----------
+    def on_touch_down(self, touch) -> bool:
+        if not self.collide_point(*touch.pos):
+            return False
+        cx, cy = self.joystick_center()
+        inside = ((touch.x - cx) ** 2 + (touch.y - cy) ** 2) ** 0.5 <= self.joy_radius * 1.15
+        if inside:
+            self._joystick.begin(cx, cy)   # 摇杆：基点固定左下
+        else:
+            self._joystick.begin(touch.x, touch.y)  # 滑动：以按下点为起点
+        self._touch_uid = touch.uid
+        return True
+
+    def on_touch_move(self, touch) -> bool:
+        if touch.uid != self._touch_uid:
+            return False
+        d = self._joystick.move(touch.x, touch.y)
+        if d is not None and self.on_direction is not None:
+            self.on_direction(d)
+        return True
+
+    def on_touch_up(self, touch) -> bool:
+        if touch.uid != self._touch_uid:
+            return False
+        self._joystick.end()
+        self._touch_uid = None
+        return True
+
+    # ---------- 虚拟摇杆（M4/R1） ----------
+    def joystick_center(self) -> tuple[float, float]:
+        r = self.joy_radius
+        return (r + 24.0, r + 24.0)
+
+    def _draw_joystick(self) -> None:
+        cx, cy = self.joystick_center()
+        r = self.joy_radius
+        Color(1, 1, 1, 0.12)
+        Line(circle=(cx, cy, r), width=2)
+        vx, vy = self._joystick.vector()
+        mag = (vx * vx + vy * vy) ** 0.5
+        if mag > 1.0:
+            vx, vy = vx / mag, vy / mag
+        Color(1, 1, 1, 0.28)
+        Line(circle=(cx + vx * r * 0.6, cy + vy * r * 0.6, r * 0.35), width=2)

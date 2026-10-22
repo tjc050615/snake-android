@@ -33,6 +33,7 @@ from core.game import Game
 from core.snake import DIR_DOWN, DIR_LEFT, DIR_RIGHT, DIR_UP, Snake
 from platform_layer import desktop
 from view.game_canvas import GameCanvas
+from view.panel import Panel
 
 DEFAULT_SEED = 20261022
 FRAME_INTERVAL = 1.0 / 60.0
@@ -84,9 +85,19 @@ class SnakeApp(App):
             self.session = AISession()
             self.game.tick_listeners.append(self._ai_tick)
         self.canvas_widget = GameCanvas(self.game)
+        self.canvas_widget.size_hint = (0.70, 1.0)
+        self.canvas_widget.pos_hint = {"x": 0, "y": 0}
+        self.canvas_widget.on_direction = self._on_direction
+
+        self.panel = Panel(self.game, on_wrap=self._toggle_wrap, on_restart=self._restart)
+        self.panel.size_hint = (0.30, 1.0)
+        self.panel.pos_hint = {"right": 1, "y": 0}
 
         root = FloatLayout()
         root.add_widget(self.canvas_widget)
+        root.add_widget(self.panel)
+        # 布局完成后再刷一次文案：面板首次创建时宽度为 0，纹理会按 0 宽缓存
+        Clock.schedule_once(lambda _dt: self.panel.refresh(), 0.05)
 
         Window.bind(on_key_down=self._on_key_down)
         Clock.schedule_interval(self._frame, FRAME_INTERVAL)
@@ -128,22 +139,13 @@ class SnakeApp(App):
             Clock.schedule_once(lambda _dt: self.stop(), self.smoke_seconds)
         return root
 
-    # ---------- 穿墙开关（GUI） ----------
-    def _build_wrap_button(self) -> None:
-        """HUD 由 GameCanvas 用 CoreLabel 绘制，这里不再建 Widget。"""
-        return
-
+    # ---------- 面板按钮回调 ----------
     def _toggle_wrap(self) -> None:
         self.game.set_wrap_mode(not self.game.wrap_mode)
         self.canvas_widget.rebuild()
 
-    def on_touch_down(self, touch) -> bool:
-        """点击左上角 HUD 区域切换穿墙模式。"""
-        x, y, w, h = self.canvas_widget.wrap_rect
-        if w > 0 and x <= touch.x <= x + w and y <= touch.y <= y + h:
-            self._toggle_wrap()
-            return True
-        return super().on_touch_down(touch)
+    def _on_direction(self, direction) -> None:
+        self.game.set_direction(direction)
 
     def _apply_window_size(self) -> None:
         if desktop.is_android():
@@ -164,6 +166,8 @@ class SnakeApp(App):
         summary = self.game.update(dt)
         camera_moved = self.canvas_widget.advance(dt)
         self._update_chunks()
+        if summary.ticks or summary.died:
+            self.panel.refresh()
         if self.session is not None:
             self.canvas_widget.ai_path = self.session.current_path(self.game.ticks)
         if (
@@ -407,6 +411,12 @@ class SnakeApp(App):
         print("[SMOKE] head_screen   =", f"{tuple(round(v, 1) for v in m['head_screen'])} inside={m['head_inside']}")
         print("[SMOKE] progress      =", f"{m['progress']:.3f}")
         print("[SMOKE] chunks_loaded =", len(self.game.world.loaded_chunks()))
+        try:
+            b = self.panel.btn_wrap
+            print("[SMOKE] panel_btn     =", f"text={b.text!r} font={b.font_name!r} "
+                  f"size={b.size} tex={b.texture_size} font_size={b.font_size}")
+        except Exception as exc:  # pragma: no cover
+            print("[SMOKE] panel_btn err =", exc)
         if self.session is not None:
             print("[SMOKE] ai_stats      =", self.session.stats)
         print("[SMOKE] dead_rebuilds =", self._rebuilds_after_death)
