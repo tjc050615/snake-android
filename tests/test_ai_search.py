@@ -47,6 +47,56 @@ def test_astar_tiebreak_prefers_lower_x_then_y():
     assert p1[-1] == (2, 2)
 
 
+# ---------- g 值更新（重复访问同一格） ----------
+def _bfs_len(start, goal, passable, rect):
+    from collections import deque
+
+    q = deque([(start, 0)])
+    seen = {start}
+    while q:
+        cell, d = q.popleft()
+        if cell == goal:
+            return d
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nxt = (cell[0] + dx, cell[1] + dy)
+            if nxt in seen or not passable(nxt):
+                continue
+            if not (rect[0] <= nxt[0] <= rect[2] and rect[1] <= nxt[1] <= rect[3]):
+                continue
+            seen.add(nxt)
+            q.append((nxt, d + 1))
+    return -1
+
+
+def test_astar_prefers_shorter_g_when_revisiting_cell():
+    """有墙的迷宫里，A* 必须有 g 值更新，否则会沿先入的长路径回溯进死路。"""
+    layer1 = {(3, y) for y in range(-4, 4)}          # 竖墙，留上方缺口
+    layer2 = {(7, y) for y in range(-4, 4)}          # 第二道竖墙
+    blocked = layer1 | layer2
+
+    def passable(c):
+        return c not in blocked
+
+    rect = _rect(-10, -10, 14, 14)
+    path = astar((0, 0), (10, 0), passable, rect)
+    shortest = _bfs_len((0, 0), (10, 0), passable, rect)
+
+    assert path, "应该找到路径"
+    assert path[-1] == (10, 0)
+    assert len(path) == shortest
+    assert len(set(path)) == len(path), "路径不应出现重复格（说明 parent 回溯错了）"
+
+
+def test_astar_max_nodes_exhausted_returns_best_so_far():
+    """max_nodes 用尽且未找到目标 → 返回空路径；已找到则返回当前最优。"""
+    rect = _rect(-20, -20, 20, 20)
+    far = astar((0, 0), (30, 0), lambda c: True, rect, max_nodes=5)
+    assert far == []
+
+    near = astar((0, 0), (2, 0), lambda c: True, rect, max_nodes=50)
+    assert near == [(1, 0), (2, 0)]
+
+
 # ---------- 节点池 ----------
 def test_node_pool_no_leak():
     pool = NodePool()
@@ -76,22 +126,34 @@ def test_controller_path_stays_in_vision_and_avoids_walls():
         assert cell not in game.snake.occupied
 
 
+def _inject_food(world, cells):
+    """测试用：把食物同时写进全局集合与分桶。"""
+    from core.world import chunk_coord
+
+    for c in cells:
+        world._foods.add(c)  # noqa: SLF001
+        world._foods_by_chunk.setdefault(chunk_coord(c), set()).add(c)  # noqa: SLF001
+
+
 def test_controller_picks_nearest_food():
     game = Game(7)
-    game.world.ensure_chunk(0, 0)
+    for cx in (0, 1):
+        for cy in (0, 1):
+            game.world.ensure_chunk(cx, cy)
     head = game.snake.head
     near = (head[0] + 3, head[1])
     far = (head[0] + 9, head[1])
-    game.world._foods = {near, far}  # noqa: SLF001 - 测试构造
-    game.world._foods_by_chunk = {  # noqa: SLF001
-        (0, 0): {near, far}
-    }
+    game.world._foods.clear()  # noqa: SLF001
+    game.world._foods_by_chunk.clear()  # noqa: SLF001
+    _inject_food(game.world, {near, far})
+
     ai = AIController()
     path = ai.plan(game.world, game.snake)
     assert path[-1] == near
 
 
-def test_controller_no_food_is_idle():
+def test_controller_no_food_follows_tail():
+    """R2：没有食物（或都不安全）→ FOLLOW_TAIL，而不是干等。"""
     world = World(3)
     world.ensure_chunk(0, 0)
     world._foods.clear()  # noqa: SLF001
@@ -100,7 +162,7 @@ def test_controller_no_food_is_idle():
     game.world = world
     ai = AIController()
     assert ai.plan(world, game.snake) == []
-    assert ai.state == "IDLE"
+    assert ai.state == "FOLLOW_TAIL"
 
 
 def test_safe_step_rejects_wall_and_self():
@@ -121,21 +183,56 @@ def test_fallback_direction_is_deterministic_order():
     assert d in ((0, 1), (1, 0), (0, -1), (-1, 0))
 
 
+def test_fallback_picks_first_available_in_order():
+    """上被挡、右被挡 → 必须返回"下"，而不是随便挑一个安全方向。"""
+    from core.snake import Snake as S
+
+    world = World(9)
+    world.ensure_chunk(0, 0)
+    snake = S([(0, 0)], DIR_RIGHT)
+    world.add_blocked((0, 1))  # 上
+    world.add_blocked((1, 0))  # 右
+
+    ai = AIController()
+    assert ai.fallback_direction(world, snake) == (0, -1)
+
+
 def test_decide_returns_direction_toward_food():
     game = Game(5)
-    game.world.ensure_chunk(0, 0)
+    for cx in (0, 1):
+        for cy in (0, 1):
+            game.world.ensure_chunk(cx, cy)
     head = game.snake.head
-    game.world._foods = {(head[0] + 4, head[1])}  # noqa: SLF001
-    game.world._foods_by_chunk = {(0, 0): set(game.world._foods)}  # noqa: SLF001
+    game.world._foods.clear()  # noqa: SLF001
+    game.world._foods_by_chunk.clear()  # noqa: SLF001
+    _inject_food(game.world, {(head[0] + 4, head[1])})
+
     ai = AIController()
     assert ai.decide(game.world, game.snake) == (1, 0)
 
 
-def test_vision_rect_respects_viewport():
-    ai = AIController(view_w=21, view_h=11)
-    rect = ai.rect_for((0, 0), snake_len=100)  # 半径被视口夹住
-    assert rect[2] - rect[0] == 20
-    assert rect[3] - rect[1] == 10
+def test_vision_uses_loaded_chunks_not_viewport():
+    """视野 = 已加载 chunk 范围，不是视口一半（41×23 视口只给 20 格是错的）。"""
+    from core.chunk_manager import ChunkManager
+
+    game = Game(1)
+    mgr = ChunkManager(game.world)
+    for _ in range(120):
+        mgr.update((0, 0, 40, 22))  # 视口 41×23，预加载 2 圈 → 6×5 chunk
+    ai = AIController(view_w=41, view_h=23)
+    rect = ai.rect_for(game.snake.head, snake_len=100, world=game.world)
+    assert rect[2] - rect[0] > 100, rect
+    assert rect[3] - rect[1] > 100, rect
+
+
+def test_vision_is_clamped_to_loaded_rect():
+    game = Game(1)
+    game.world.ensure_chunk(0, 0)  # 只加载 1 个 chunk
+    ai = AIController()
+    rect = ai.rect_for(game.snake.head, snake_len=100, world=game.world)
+    loaded = game.world.loaded_rect()
+    assert rect[0] >= loaded[0] and rect[2] <= loaded[2]
+    assert rect[1] >= loaded[1] and rect[3] <= loaded[3]
 
 
 def test_search_radius_formula():

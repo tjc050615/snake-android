@@ -47,6 +47,22 @@ class World:
         """已加载 chunk 的 key 集合（副本，供 ChunkManager 与调试面板用）。"""
         return set(self._chunks)
 
+    def loaded_rect(self) -> tuple[int, int, int, int] | None:
+        """已加载 chunk 覆盖的格矩形（含端点）；没有 chunk 时返回 None。
+
+        AI 的"视野"就是这个范围：视口 + 预加载圈数内的所有食物与障碍。
+        """
+        if not self._chunks:
+            return None
+        xs = [k[0] for k in self._chunks]
+        ys = [k[1] for k in self._chunks]
+        return (
+            min(xs) * C.CHUNK_SIZE,
+            min(ys) * C.CHUNK_SIZE,
+            (max(xs) + 1) * C.CHUNK_SIZE - 1,
+            (max(ys) + 1) * C.CHUNK_SIZE - 1,
+        )
+
     # ---------- M3 AI 接口（只读，禁止 AI 直接碰 _blocked/_foods/_chunks） ----------
     def _chunk_range(self, x0: int, y0: int, x1: int, y1: int) -> tuple[int, int, int, int]:
         lo_x, hi_x = (x0, x1) if x0 <= x1 else (x1, x0)

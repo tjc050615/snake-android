@@ -16,6 +16,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "restart_confirm": "确定要重新开始吗？",
         "wrap_on": "穿墙: 开",
         "wrap_off": "穿墙: 关",
+        "safety_l2_note": "连通面积校验为启发式加强，非严格保证",
     },
     "en": {
         "game_over": "GAME OVER",
@@ -25,6 +26,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "restart_confirm": "Restart this run?",
         "wrap_on": "Wrap: ON",
         "wrap_off": "Wrap: OFF",
+        "safety_l2_note": "Connectivity check is a heuristic, not a proof",
     },
 }
 
