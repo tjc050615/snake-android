@@ -111,6 +111,28 @@ def test_loop_guard_triggers_on_repeated_head():
     assert ai.state == STATE_FOLLOW_TAIL
 
 
+def test_follow_tail_switches_back_to_food_when_safe():
+    """跟尾过程中出现安全食物 → 自动切回 SEEKING_FOOD。"""
+    from ai.controller import STATE_SEEKING_FOOD
+
+    game = Game(13)
+    game.world.ensure_chunk(0, 0)
+    game.world._foods.clear()  # noqa: SLF001
+    game.world._foods_by_chunk.clear()  # noqa: SLF001
+
+    ai = AIController()
+    ai.plan(game.world, game.snake)
+    assert ai.state == STATE_FOLLOW_TAIL
+
+    head = game.snake.head
+    food = (head[0] + 3, head[1])
+    game.world._foods.add(food)  # noqa: SLF001
+    game.world._foods_by_chunk.setdefault((0, 0), set()).add(food)  # noqa: SLF001
+
+    ai.plan(game.world, game.snake)
+    assert ai.state == STATE_SEEKING_FOOD
+
+
 def test_wrap_mode_ai_survives_walls():
     game = Game(9)
     game.world.ensure_chunk(0, 0)
