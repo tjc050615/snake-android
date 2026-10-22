@@ -85,6 +85,8 @@ def main() -> int:
     app.wrap = "--wrap" in sys.argv
     app.wrap_scene = app.wrap
     app.spawn_shot = "--spawnshot" in sys.argv
+    app.ai = "--ai" in sys.argv
+    app.clip_demo = "--clipdemo" in sys.argv
     app.speed = _parse_speed(sys.argv)
     app.window_size = _parse_size(sys.argv)
     app.run()

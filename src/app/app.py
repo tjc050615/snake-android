@@ -23,6 +23,8 @@ from kivy.metrics import Metrics
 
 from kivy.uix.floatlayout import FloatLayout
 
+from ai.session import AISession
+
 from app import constants as C
 from app import strings
 from app.fonts import font_name, register_fonts
@@ -62,6 +64,8 @@ class SnakeApp(App):
     wrap = False
     wrap_scene = False
     spawn_shot = False
+    ai = False
+    clip_demo = False
 
     # ---------- 构建 ----------
     def build(self) -> GameCanvas:
@@ -75,6 +79,10 @@ class SnakeApp(App):
         self.chunk_mgr = ChunkManager(self.game.world)
         if self.wrap:
             self.game.set_wrap_mode(True)
+        self.session: AISession | None = None
+        if self.ai:
+            self.session = AISession()
+            self.game.tick_listeners.append(self._ai_tick)
         self.canvas_widget = GameCanvas(self.game)
 
         root = FloatLayout()
@@ -110,6 +118,9 @@ class SnakeApp(App):
                     )
             if self.spawn_shot:
                 Clock.schedule_once(lambda _dt: self._shot("spawn"), 0.8)
+            if self.clip_demo:
+                Clock.schedule_once(self._setup_clip_scene, 0.2)
+                Clock.schedule_once(lambda _dt: self._shot("clip"), 0.8)
             if self.wrap_scene:
                 Clock.schedule_once(self._setup_wrap_scene, 0.2)
                 Clock.schedule_once(lambda _dt: self._shot("wrap"), 0.9)
@@ -153,6 +164,8 @@ class SnakeApp(App):
         summary = self.game.update(dt)
         camera_moved = self.canvas_widget.advance(dt)
         self._update_chunks()
+        if self.session is not None:
+            self.canvas_widget.ai_path = self.session.current_path(self.game.ticks)
         if (
             self.game.state == "running"
             or summary.ticks
@@ -164,6 +177,14 @@ class SnakeApp(App):
                 self._rebuilds_after_death += 1
         if summary.died:
             self.canvas_widget.show_game_over(self.game.score)
+
+    def _ai_tick(self, game) -> None:
+        """每个逻辑 tick 开始前调用：AI 方向写入 game（下一 tick 生效）。"""
+        if self.session is None:
+            return
+        d = self.session.tick(game.world, game.snake, game.wrap_mode, speed=self.speed)
+        if d is not None:
+            game.set_direction(d)
 
     def _update_chunks(self) -> None:
         vp = self.canvas_widget.viewport
@@ -211,6 +232,39 @@ class SnakeApp(App):
         """死亡后把蛇头挪远：相机会继续滑动，用于验证"死亡后仍重绘"。"""
         head = self.game.snake.head
         self.game.snake.body[0] = (head[0] - 25, head[1])
+
+    # ---------- 演示：路径被视口边缘截断 ----------
+    def _setup_clip_scene(self, _dt: float) -> None:
+        from ai.controller import AIController
+        from core.snake import DIR_RIGHT, Snake
+        from core.world import chunk_coord
+
+        world = self.game.world
+        for cx in range(0, 4):
+            for cy in range(-1, 2):
+                world.ensure_chunk(cx, cy)
+        world._foods.clear()  # noqa: SLF001
+        world._foods_by_chunk.clear()  # noqa: SLF001
+
+        head = (0, 0)
+        vp = self.canvas_widget.viewport
+        g = vp.grid_size if vp else 34
+        half = int(vp.width // g // 2) if vp else 20
+        # 放在"搜索半径内、视口外"：路径存在但必须被视口裁掉
+        food = (half + 4, 0)
+        world._foods.add(food)  # noqa: SLF001
+        world._foods_by_chunk.setdefault(chunk_coord(food), set()).add(food)  # noqa: SLF001
+
+        self.game.snake = Snake([head, (-1, 0), (-2, 0)], DIR_RIGHT)
+        cam = self.canvas_widget.camera
+        if cam is not None:
+            cam.reset(head)
+            self.canvas_widget.viewport = cam.viewport()
+
+        # 直接构造一条跨越视口右边缘的路径，确定性验证"只画到屏内"
+        self.canvas_widget.ai_path = [(i, 0) for i in range(1, 60)]
+        self._frozen = True
+        self.canvas_widget.rebuild()
 
     # ---------- 演示：穿墙撞墙不死 ----------
     def _setup_wrap_scene(self, _dt: float) -> None:
@@ -353,6 +407,8 @@ class SnakeApp(App):
         print("[SMOKE] head_screen   =", f"{tuple(round(v, 1) for v in m['head_screen'])} inside={m['head_inside']}")
         print("[SMOKE] progress      =", f"{m['progress']:.3f}")
         print("[SMOKE] chunks_loaded =", len(self.game.world.loaded_chunks()))
+        if self.session is not None:
+            print("[SMOKE] ai_stats      =", self.session.stats)
         print("[SMOKE] dead_rebuilds =", self._rebuilds_after_death)
         if self.canvas_widget._status_text:  # noqa: SLF001
             print("[SMOKE] label         =", repr(self.canvas_widget._status_text.replace("\n", " | ")))  # noqa: SLF001

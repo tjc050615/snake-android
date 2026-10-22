@@ -29,7 +29,7 @@ def level1_reachable(
     snake,
     food: tuple[int, int],
     wrap_mode: bool = False,
-    max_nodes: int = 6000,
+    max_nodes: int = 2000,
 ) -> bool:
     """一级：新蛇头到蛇尾是否可达。"""
     body = set(body_after_eat(snake, food))

@@ -21,7 +21,7 @@ STATE_DEAD = "DEAD"
 
 # 确定性降级顺序：上 → 右 → 下 → 左（D-018）
 FALLBACK_DIRS = ((0, 1), (1, 0), (0, -1), (-1, 0))
-MAX_FOOD_CANDIDATES = 8
+MAX_FOOD_CANDIDATES = 4
 LOOP_WINDOW = 20
 LOOP_THRESHOLD = 3
 
@@ -43,6 +43,7 @@ class AIController:
         self.state = STATE_IDLE
         self.path: list[tuple[int, int]] = []
         self.recent_heads: deque[tuple[int, int]] = deque(maxlen=LOOP_WINDOW)
+        self.radius_cap = 80  # 高速档由会话改成 40（D-040）
         self._nudge_offset = 0
         self.stats = {
             "state": self.state,
@@ -58,7 +59,7 @@ class AIController:
 
     # ---------- 视野 ----------
     def search_radius(self, snake_len: int) -> int:
-        return min(snake_len + 20, 80)
+        return min(snake_len + 20, self.radius_cap)
 
     def rect_for(self, head, snake_len, world=None):
         r = self.search_radius(snake_len)
@@ -76,7 +77,7 @@ class AIController:
         )
 
     # ---------- 规划 ----------
-    def plan(self, world, snake, wrap_mode: bool = False):
+    def plan(self, world, snake, wrap_mode: bool = False, deadline=None):
         head = snake.head
         self.recent_heads.append(head)
         rect = self.rect_for(head, len(snake), world)
@@ -96,7 +97,9 @@ class AIController:
         if self.recent_heads.count(head) >= LOOP_THRESHOLD:
             self.stats["loop_guard"] += 1
             self._nudge_offset = (self._nudge_offset + 1) % 4
-            return self._follow_tail(snake, rect, passable)
+            # 关键：触发后清空窗口，否则会每 tick 都命中、永远回不到找食物
+            self.recent_heads.clear()
+            return self._follow_tail(snake, rect, passable, deadline=deadline)
 
         foods = sorted(
             (c for c in world.foods_in_rect(*rect) if in_rect(c)),
@@ -104,6 +107,8 @@ class AIController:
         )
 
         for food in foods[:MAX_FOOD_CANDIDATES]:
+            if deadline is not None and time.perf_counter() > deadline:
+                break  # 预算耗尽：不再尝试更多候选，直接走兜底
             if not safety.level1_reachable(world, snake, food, wrap_mode):
                 self.stats["blocked_l1"] += 1
                 continue
@@ -111,17 +116,19 @@ class AIController:
                 self.stats["blocked_l2"] += 1
                 continue
 
-            path = astar(head, food, passable, rect, pool=self.pool, max_nodes=self.max_nodes)
+            path = astar(head, food, passable, rect, pool=self.pool,
+                         max_nodes=self.max_nodes, deadline=deadline)
             if path:
                 self.path = path
                 self.state = STATE_SEEKING_FOOD
                 self.stats.update(state=self.state, path_len=len(path), nodes=self.pool.created)
                 return path
-            return self._follow_tail(snake, rect, passable)
+            # A* 空路径不代表其它食物不可达：继续尝试下一个候选
+            continue
 
-        return self._follow_tail(snake, rect, passable)
+        return self._follow_tail(snake, rect, passable, deadline=deadline)
 
-    def _follow_tail(self, snake, rect, passable):
+    def _follow_tail(self, snake, rect, passable, deadline=None):
         self.stats["follow_tail"] += 1
         tail = snake.tail
         self.state = STATE_FOLLOW_TAIL
@@ -135,7 +142,7 @@ class AIController:
             return True if c == tail else passable(c)
 
         path = astar(snake.head, tail, passable_tail, rect, pool=self.pool,
-                     max_nodes=self.max_nodes)
+                     max_nodes=self.max_nodes, deadline=deadline)
         self.path = path
         self.stats.update(state=self.state, path_len=len(path))
         return path
@@ -177,7 +184,8 @@ class AIController:
 
     def decide(self, world, snake, wrap_mode: bool = False, timeout_s: float = 0.008):
         t0 = time.perf_counter()
-        path = self.plan(world, snake, wrap_mode)
+        deadline = t0 + max(0.0005, timeout_s)
+        path = self.plan(world, snake, wrap_mode, deadline=deadline)
         direction = self.next_direction(snake) if path else None
         self.stats["cost_ms"] = (time.perf_counter() - t0) * 1000.0
 

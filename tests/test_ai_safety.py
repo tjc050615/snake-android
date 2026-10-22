@@ -133,6 +133,25 @@ def test_follow_tail_switches_back_to_food_when_safe():
     assert ai.state == STATE_SEEKING_FOOD
 
 
+def test_nudge_offset_changes_follow_direction(monkeypatch):
+    """防循环不能只切状态：offset 必须真的改变跟尾时的方向优先级。"""
+    from core.snake import DIR_RIGHT, Snake as S
+
+    world = World(9)
+    world.ensure_chunk(0, 0)
+    snake = S([(0, 0)], DIR_RIGHT)  # 长度 1，四邻全空
+
+    ai = AIController()
+    assert ai.fallback_direction(world, snake, offset=0) == (0, 1)   # 上
+    assert ai.fallback_direction(world, snake, offset=1) == (1, 0)   # 右
+
+    ai.state = STATE_FOLLOW_TAIL
+    ai._nudge_offset = 1
+    ai.path = []
+    monkeypatch.setattr(ai, "plan", lambda *a, **k: [])
+    assert ai.decide(world, snake) == (1, 0)
+
+
 def test_wrap_mode_ai_survives_walls():
     game = Game(9)
     game.world.ensure_chunk(0, 0)

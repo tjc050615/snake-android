@@ -41,6 +41,7 @@ class GameCanvas(Widget):
         self.camera: Camera | None = None
         self.too_small = False
         self._resize_event: ClockEvent | None = None
+        self.ai_path: list[tuple[int, int]] = []  # M3：AI 路径（半透明折线）
         self.wrap_rect = (0.0, 0.0, 0.0, 0.0)  # HUD 穿墙开关的可点击矩形
         self._status_text = ""
 
@@ -204,6 +205,22 @@ class GameCanvas(Widget):
                 if self.game.world.block_kind(cell) == BLOCK_WALL:
                     rx, ry, w, h = vp.cell_rect(cell)
                     Rectangle(pos=(rx + 1, ry + 1), size=(w - 2, h - 2))
+
+            # AI 路径：画在蛇身下层、半透明浅蓝（R3）；只画视口内的连续段（R4 裁剪）
+            if self.ai_path:
+                Color(0.45, 0.75, 1.0, 0.35)
+                run: list[float] = []
+                for cell in self.ai_path:
+                    visible = vp.covers(cell)
+                    if not visible:
+                        if len(run) >= 4:
+                            Line(points=run, width=2)
+                        run = []
+                        continue
+                    px, py = to_pixel((float(cell[0]), float(cell[1])), g, vp.origin_x, vp.origin_y)
+                    run.extend((px, py))
+                if len(run) >= 4:
+                    Line(points=run, width=2)
 
             # 蛇身：浮点格坐标 → 像素，矩形以格中心为锚点
             cells = segment_cells(self.game.snake, self.game.tick_progress)

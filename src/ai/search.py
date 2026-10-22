@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import heapq
+import time
 from dataclasses import dataclass, field
 
 
@@ -66,10 +67,15 @@ def astar(
     rect: tuple[int, int, int, int],
     pool: NodePool | None = None,
     max_nodes: int = 4000,
+    deadline: float | None = None,
+    check_every: int = 100,
 ) -> list[tuple[int, int]]:
     """返回从 start 的下一步到 goal 的路径（含 goal，不含 start）。
 
-    找不到路径返回 []。
+    - 找不到路径返回 []
+    - `deadline`（time.perf_counter 时间戳）到期时中断：
+      已找到目标则返回该路径；否则返回"当前最优节点"的路径（部分路径），
+      由调用方再做 O(1) 安全校验与降级。
     """
     if start == goal:
         return []
@@ -91,8 +97,15 @@ def astar(
     counter = 1
     expanded = 0
     found: Node | None = None
+    best_node: Node = start_node
+    best_h = manhattan(start, goal)
+    timed_out = False
 
     while open_heap:
+        if deadline is not None and expanded % check_every == 0 and time.perf_counter() > deadline:
+            timed_out = True
+            break
+
         _f, _h, _x, _y, _seq = heapq.heappop(open_heap)
         cell = (_x, _y)
         if cell in closed:
@@ -101,6 +114,11 @@ def astar(
         expanded += 1
         if expanded > max_nodes:
             break
+
+        h_cell = manhattan(cell, goal)
+        if h_cell < best_h:
+            best_h = h_cell
+            best_node = nodes[cell]
 
         if cell == goal:
             found = nodes[cell]
@@ -130,6 +148,9 @@ def astar(
             counter += 1
 
     path: list[tuple[int, int]] = []
+    if found is None and timed_out and best_node is not start_node:
+        found = best_node  # 超时：返回"当前最优"的部分路径
+
     if found is not None:
         cur = found
         while cur is not None and cur.parent is not None:

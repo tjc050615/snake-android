@@ -31,6 +31,8 @@ class Game:
         self.seed = int(seed)
         # 穿墙模式（D-025）：True 时忽略障碍/墙壁，但自撞仍然死
         self.wrap_mode = False
+        # 每个逻辑 tick 开始前的回调（AI 等），回调内可调用 set_direction
+        self.tick_listeners: list = []
         self.reset(self.seed)
 
     # ---------- 模式 ----------
@@ -78,6 +80,8 @@ class Game:
 
     def _tick(self):
         self.ticks += 1
+        for listener in self.tick_listeners:
+            listener(self)
         result = self.snake.step(self.world, ignore_blocked=self.wrap_mode)
         if result.ate:
             self.score += 1

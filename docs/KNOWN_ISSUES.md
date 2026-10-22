@@ -27,6 +27,12 @@
 | KI-002 | M1/R1 | P1 | 本机 Python 3.14 装不上 Kivy 2.3.0，GUI 未实跑 | 建 `.venv`(3.11.3) + kivy 2.3.0；`--smoke` 多轮 exit 0，4 张多分辨率截图 | 2026-10-22 |
 | KI-011 | M3 前 | P2 | 矩形查询 O(n) | 加 `_blocked_by_chunk` / `_foods_by_chunk` 分桶；42 chunk 下 p95 0.043ms；`tests/test_rect_query_perf.py` | 2026-10-22 |
 | KI-012 | M3 前置 | — | **Kivy 按钮中文渲染方案已确定（M4 用）**：A=`Button(text,font_name=SnakeCJK)` ✅；B=`ButtonBehavior+Label` ✅（可渲染但无背板，需自绘）；C=`Button+markup` 与 A 逐字节相同（markup 不影响 CJK 字形）。**根因**：早先"只出现几个点"不是字体问题，而是 Button 作为 `GameCanvas` 的子 Widget 被每帧 `canvas.clear()` 连带清掉。**M4 结论：按钮放在覆盖层 `FloatLayout`（与 GameCanvas 同级），用方案 A** | 2026-10-22 |
+| KI-013 | M3/R3 | P3 | `level2_area` 在超过 `need+1` 时提前返回，返回值是**上限值不是真实面积**；只有 `level2_ok` 的布尔判断可以用它。统计面板/调试若直接读面积会得到偏小值 | 读 `src/ai/safety.py` 注释 | M4 | open |
+| KI-014 | M3/R3 | P3 | `foods[:8]` 截断没有放宽机制：连续多 tick 最近 8 个食物全被安全校验拒绝时，AI 会持续跟尾。M4 观察长局后再决定是否加"连续 N 次全不安全 → 扩到 16" | 长局统计 `blocked_l1+blocked_l2` | M4 | open |
+| KI-015 | M3/R3 | P2 | A* 基线 p95 1.08ms 是**开放空间**数据；有密集障碍/墙壁时扩展节点更多。R3 必须补障碍场景基线，8ms 超时阈值以障碍场景为准 | `tests/test_ai_timeout.py` | R3 | **fixed**（棋盘格 64×64 基线 p95 **1.66ms**） |
+| KI-016 | M3/R4 | P2 | **决策生效语义**：R3 的 `session.tick` 是"同 tick 消费"（B），与注释/ARCH 的"下一 tick 生效"矛盾。实测真延迟一 tick 会让路径随蛇头位移失效（79 tick 就死）→ **采用方案 B 并改文档**：方向作用于本次 step，`Snake.pending` 天然延迟一步；ARCH §15 已同步 | `--ai` 长局 | R3 | **fixed**（文档对齐，不做人为延迟） |
+| KI-017 | M3/R4 | P2 | 决策耗时：`timeouts` 占比应 <5%（实测 0%）；但**峰值偶发 10~12ms**（安全校验 BFS 未纳入 deadline），超过 8ms 硬上限。M4 前把 level1/level2 也纳入统一预算或降为抽样校验 | `test_m3_scenarios` 的 cost_peak | M4 | open |
+| KI-018 | M3/R4 | P3 | 有障碍基线是 64×64 棋盘格；**90% 障碍迷宫**下 A* 扩展会爆炸，超 8ms 走 best-effort 属预期，但日志必须标记 `timeouts`。R4 未构造 90% 场景 | 高密度迷宫 | M4/M5 | open |
 
 ## 阶段记录
 
