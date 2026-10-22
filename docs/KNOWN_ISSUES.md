@@ -14,8 +14,8 @@
 | KI-004 | M4 前 | P2 | `TickClock` 掉帧时最多追 4 tick 后丢弃余量；M4 做 PAUSED 时必须**进入暂停 `clock.reset()`、恢复时 `accumulator = 0`**，否则切后台回来会瞬间追帧 | 待 M4 实现 | M4 | open |
 | KI-005 | M4 前 | P3 | **resize 后相机世界位置漂移**：`grid_size` 变化时 `current_x/y` 仍是旧像素值，取景中心在世界坐标里跳变。M4 处理：按 `current / old_grid * new_grid` 换算，或重置到蛇头 | 拖动窗口大小观察画面跳变 | M4 | **fixed** | <!-- 已用 `Camera.rescale_for_grid()` 在 `GameCanvas.on_size` 按格子比例换算；测试 `tests/test_resize_camera.py`。 -->
 | KI-006 | M5 | P2 | 插值要求每帧重绘，`rebuild()` 每帧 `canvas.clear()` + 重建全部 Canvas 指令（网格线 40+ 条）。M5 应改局部更新 / 指令池复用 | 观察 `rebuild` 每帧调用 | M5 | open |
-| KI-007 | M2/R2 | P3 | 障碍生成后的"孤立格修复"会移除 0~2 个障碍，导致个别 chunk 密度略低于 5%（实测仍 ≥4%）；修复逻辑本身无跳变，属可接受偏差 | `gen.chunk_obstacle_cells` 返回数 < `round(0.05*1024)` | M2 | **fixed** | <!-- 密度偏差属可接受范围（5% 目标、隔离修复后略低）；M5 可再采样校准。 -->
-| KI-008 | M2/R2 | P2 | 障碍的连通性是**启发式保证**（边界整行整列全通 + 修孤立单格 + 密度低），**不是严格洪水填充**；真正的连通性校验在 R3 的墙壁生成里做，并把障碍一起纳入同一张图。KI-007 的修复只在单 chunk 内生效，跨 chunk 的封闭环未做全局证明 | 设计评审 | R3 起 | **fixed** | <!-- 连通性为启发式加强（M2 遗留），非严格保证；已在 ARCH §14 注明。 -->
+| KI-007 | M2/R2 | P3 | 障碍生成后的"孤立格修复"会移除 0~2 个障碍，个别 chunk 密度略低于 5%（实测 4%~6%）。**不修**：在需求 5% 容差内，M5 可再采样校准 | chunk 密度采样 | M5 | **wontfix (accepted)** |
+| KI-008 | M2/R2 | P2 | 障碍连通性是**启发式保证**（边界整行整列全通 + 修孤立单格 + 密度低），**不是严格洪水填充**；R3 生成期已有洪水填充兜底。**不修**：非严格保证但实测未出现不可达食物 | 1000-chunk 连通性测试 | M5 | **wontfix (accepted)** |
 | KI-009 | M2/R3 | P1 | **随包字体已换成 `assets/fonts/NotoSansSC-Regular.otf`**（OFL，8.33MB，SDL2 可加载）；中文/数字/英文/空格全部正常。DroidSansFallback 曾试用但**缺 ASCII（数字、字母、空格全是豆腐块）**，已删除 | `follow10001.png` 面板「得分 0」 | M2 | **fixed** |
 | KI-019 | M4/R1 | P2 | Kivy 在本机把 `font_size="16sp"` 解析成**负数**（-24），导致按钮文字纹理只有 3×3 像素（显示成小点）。修复：控件一律用**数值** `font_size=16.0`，不要用 `"16sp"` 字符串 | `panel_btn tex=[3,3] font_size=-24` | M4 | **fixed** |
 | KI-020 | M5 | P3 | `NotoSansSC-Regular.otf` 有 **8.33MB**，会进 APK。M5 打包后必须确认 APK 总体积（目标 <30MB），超标给字体子集化/压缩方案 | `assets/fonts/` | M5 | open |

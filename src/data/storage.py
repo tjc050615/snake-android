@@ -76,9 +76,34 @@ def validate(raw: dict) -> dict:
     return cfg
 
 
-def home_dir() -> str:
-    """数据目录：优先环境变量 SNAKE_HOME（测试/沙箱），否则用户私有目录。"""
-    return os.environ.get("SNAKE_HOME") or os.path.join(os.path.expanduser("~"), ".snake_android")
+def home_dir(platform_name: str | None = None, user_data_dir: str | None = None) -> str:
+    """数据目录。
+
+    优先级：SNAKE_HOME 环境变量（测试/沙箱）→ 安卓 user_data_dir → 桌面私有目录。
+    """
+    env = os.environ.get("SNAKE_HOME")
+    if env:
+        return env
+
+    if platform_name is None:
+        try:  # pragma: no cover - 无 Kivy 时走桌面分支
+            from kivy.utils import platform as platform_name  # noqa: PLC0415
+        except Exception:
+            platform_name = ""
+
+    if platform_name == "android":
+        if user_data_dir:
+            return user_data_dir
+        try:  # pragma: no cover - 仅安卓
+            from kivy.app import App  # noqa: PLC0415
+
+            app = App.get_running_app()
+            if app is not None:
+                return app.user_data_dir
+        except Exception:
+            pass
+
+    return os.path.join(os.path.expanduser("~"), ".snake_android")
 
 
 class ConfigStore:
