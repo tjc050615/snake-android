@@ -9,14 +9,15 @@ from kivy.uix.label import Label
 from app import strings
 from app.fonts import FONT_NAME
 from app.theme import palette
-from core.replay_controls import SPEEDS, ReplayControls
+from core.replay_controls import SPEEDS
 from view.themed import ThemedMixin
 
 
 class ReplayPanel(ThemedMixin, BoxLayout):
-    def __init__(self, total_ticks: int, on_close=None, **kw) -> None:
+    def __init__(self, driver, on_close=None, **kw) -> None:
         super().__init__(orientation="vertical", padding=10, spacing=6, **kw)
-        self.controls = ReplayControls(total_ticks)
+        self.driver = driver
+        self.controls = driver.controls
         self._on_close = on_close
 
         self.lbl = Label(text="", font_name=FONT_NAME, font_size=15.0,
@@ -59,6 +60,6 @@ class ReplayPanel(ThemedMixin, BoxLayout):
         self.btn_pause.text = strings.t("resume") if self.controls.paused else strings.t("play_pause")
 
     def advance(self, dt: float) -> int:
-        n = self.controls.advance(dt)
+        n = self.driver.advance(dt)
         self.refresh()
         return n

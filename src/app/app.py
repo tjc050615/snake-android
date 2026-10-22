@@ -44,6 +44,8 @@ from data.onboarding import mark_done, should_show
 from core.debug import DebugStats
 from core.audio import Haptics, SoundManager
 from core.confirm import ConfirmState
+from core.replay import Recorder
+from core.replay_player import ReplayDriver
 from core.replay_controls import ReplayControls
 from data.achievements import evaluate
 from view.confirm_dialog import ConfirmDialog
@@ -97,6 +99,7 @@ class SnakeApp(App):
     debug_shot = False
     replayui_shot = False
     confirm_shot = False
+    replaypause_shot = False
     theme_override: str | None = None
     font_override: float | None = None
 
@@ -128,6 +131,8 @@ class SnakeApp(App):
         self.debug_stats = DebugStats(enabled=False)
         self.confirm_state = ConfirmState()
         self.replay_mode = False
+        self.recorder = None  # game 创建后再初始化
+        self.replay_driver = None
         self._recorded = False
         self.pause_gate = PauseGate()
         self.achievements_overlay = None
@@ -137,6 +142,7 @@ class SnakeApp(App):
         if self.font_override:
             self.cfg["font_size"] = self.font_override
         self.game = Game(DEFAULT_SEED)
+        self.recorder = Recorder(self.game.seed, 'human')
         self.game.clock.set_speed(self.speed)
         self._foods0 = self.game.world.food_count()
         self._rebuilds_after_death = 0
@@ -235,8 +241,16 @@ class SnakeApp(App):
                 Clock.schedule_once(lambda _dt: self._toggle_debug(True), 0.3)
                 Clock.schedule_once(lambda _dt: self._shot("debug_on"), 1.0)
             if self.replayui_shot:
-                Clock.schedule_once(lambda _dt: self._open_replay(), 0.4)
-                Clock.schedule_once(lambda _dt: self._shot("replay_ui"), 1.0)
+                Clock.schedule_once(lambda _dt: self._open_replay(), 1.5)
+                Clock.schedule_once(lambda _dt: self._replay_tap(), 1.7)
+                Clock.schedule_once(lambda _dt: self._shot("replay_a"), 1.75)
+                Clock.schedule_once(lambda _dt: self._shot("replay_b"), 2.15)
+            if self.replaypause_shot:
+                Clock.schedule_once(lambda _dt: self._open_replay(), 1.5)
+                Clock.schedule_once(lambda _dt: self._replay_tap(), 1.7)
+                Clock.schedule_once(self._pause_replay, 1.9)
+                Clock.schedule_once(lambda _dt: self._shot("replay_p1"), 2.05)
+                Clock.schedule_once(lambda _dt: self._shot("replay_p2"), 2.45)
             if self.confirm_shot:
                 Clock.schedule_once(lambda _dt: self._ask_confirm("restart"), 0.4)
                 Clock.schedule_once(lambda _dt: self._shot("confirm"), 1.0)
@@ -361,11 +375,6 @@ class SnakeApp(App):
             pass
 
     def _toggle_pause(self) -> None:
-        if self.replay_mode:
-            if getattr(self, "replay_overlay", None) is not None:
-                self.replay_overlay.advance(dt)
-            self.canvas_widget.rebuild()
-            return
         if self.confirm_state.active:
             self.canvas_widget.rebuild()
             return
@@ -410,20 +419,42 @@ class SnakeApp(App):
     def _open_replay(self) -> None:
         if getattr(self, "replay_overlay", None) is not None:
             return
+        payload = self.recorder.to_payload()
+        if payload["ticks"] <= 0:
+            return
         self.replay_mode = True
         self.canvas_widget.on_direction = None  # 回放态：摇杆/滑动 no-op
-        self.replay_overlay = ReplayPanel(120, on_close=self._close_replay)
+        self.game.reset(payload["seed"])
+        self.game.clock.set_speed(self.speed)
+        if self.canvas_widget.camera is not None:
+            self.canvas_widget.camera.reset(self.game.snake.head)
+            self.canvas_widget.viewport = self.canvas_widget.camera.viewport()
+        self.replay_driver = ReplayDriver(self.game, payload)
+        self.replay_overlay = ReplayPanel(self.replay_driver, on_close=self._close_replay)
         self.replay_overlay.size_hint = (0.30, None)
         self.replay_overlay.height = 220
         self.replay_overlay.pos_hint = {"right": 1, "top": 0.98}
         self.root_layout.add_widget(self.replay_overlay)
         self.replay_overlay.apply_theme(palette(self.cfg.get("theme", "dark")))
 
+    def _replay_tap(self) -> None:
+        '''把后续输入放到回放驱动里，演示 2x 播放。'''
+        if self.replay_driver is not None:
+            self.replay_driver.set_speed(2)
+
+    def _pause_replay(self, _dt: float) -> None:
+        if self.replay_driver is not None:
+            self.replay_driver.toggle_pause()
+            if getattr(self, "replay_overlay", None) is not None:
+                self.replay_overlay.refresh()
+
     def _close_replay(self) -> None:
         if getattr(self, "replay_overlay", None) is not None:
             self.root_layout.remove_widget(self.replay_overlay)
             self.replay_overlay = None
         self.replay_mode = False
+        self.replay_driver = None
+        self.canvas_widget.overlay_text = ""
         self.canvas_widget.on_direction = self._on_direction
 
     def _ask_confirm(self, action: str) -> None:
@@ -553,6 +584,21 @@ class SnakeApp(App):
             self._update_chunks()
             self.canvas_widget.rebuild()
             return
+        if self.replay_mode:
+            driver = self.replay_driver
+            if driver is not None:
+                driver.advance(dt)
+                done = driver.progress()[0]
+                if driver.finished:
+                    self.canvas_widget.overlay_text = driver.end_text()
+                else:
+                    self.canvas_widget.overlay_text = (
+                        f"{strings.t('replay')} {done}/{driver.progress()[1]}"
+                    )
+                if getattr(self, "replay_overlay", None) is not None:
+                    self.replay_overlay.refresh()
+            self.canvas_widget.rebuild()
+            return
         if self.pause_gate.active:
             self.pause_gate.update(dt)
             if self.pause_gate.active:
@@ -565,6 +611,7 @@ class SnakeApp(App):
         camera_moved = self.canvas_widget.advance(dt)
         self._update_chunks()
         if summary.ticks or summary.died:
+            self.recorder.tick(self.game.snake.direction)
             self.panel.refresh()
         if self.debug_stats.enabled:
             self.debug_overlay.show(self.debug_stats.collect(
@@ -621,6 +668,7 @@ class SnakeApp(App):
         self.game.reset(self.game.seed)
         self.game.clock.set_speed(self.speed)
         self._recorded = False
+        self.recorder = Recorder(self.game.seed, 'human')
         self.pause_gate = PauseGate()
         self.achievements_overlay = None
         self.onboarding_overlay = None

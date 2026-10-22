@@ -69,6 +69,7 @@ ZH = {
     "resume": "继续",
     "playing": "播放中",
     "debug": "调试",
+    "replay_end": "回放结束",
 }
 
 EN = {
@@ -136,6 +137,7 @@ EN = {
     "resume": "Resume",
     "playing": "Playing",
     "debug": "Debug",
+    "replay_end": "Replay ended",
 }
 
 STRINGS: dict[str, dict[str, str]] = {"zh": ZH, "en": EN}
