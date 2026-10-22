@@ -56,12 +56,13 @@ class AISession:
         }
 
     # ---------- 每个逻辑 tick 调用 ----------
-    def tick(self, world, snake, wrap_mode: bool = False, speed: float = 1.0) -> tuple[int, int] | None:
+    def tick(self, world, snake, wrap_mode: bool = False, speed: float = 1.0,
+             budget_s: float | None = None) -> tuple[int, int] | None:
         self.ticks += 1
         high = speed >= HIGH_SPEED
         self.period = 2 if high else 1
         # 留 1ms 余量给 Python 调度抖动，保证总耗时 p99 < 8ms
-        self.timeout_s = 0.0035 if high else 0.0070
+        self.timeout_s = budget_s if budget_s is not None else (0.0035 if high else 0.0070)
         self.controller.radius_cap = 40 if high else 80
 
         # 高速档：每 2 tick 决策一次；其余每 tick

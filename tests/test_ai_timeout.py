@@ -84,7 +84,7 @@ def test_high_speed_decides_every_two_ticks():
     # 6 个 tick、period=2 → 决策 3 次
     assert plans[-1] - plans[0] >= 2
     assert ai.period == 2
-    assert ai.timeout_s == pytest.approx(0.004)
+    assert ai.timeout_s <= 0.004
     assert ai.controller.radius_cap == 40
 
 

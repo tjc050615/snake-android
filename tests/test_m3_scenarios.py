@@ -12,7 +12,8 @@ FOCUS = 18
 
 
 def _drive(game: Game, session: AISession) -> None:
-    d = session.tick(game.world, game.snake, game.wrap_mode, speed=1.0)
+    # 场景测试只验策略正确性，给足预算避免时间抖动导致非确定性
+    d = session.tick(game.world, game.snake, game.wrap_mode, speed=1.0, budget_s=1.0)
     if d is not None:
         game.set_direction(d)
 
@@ -78,12 +79,16 @@ def test_scenario_blocked_by_level1():
     world._foods_by_chunk.setdefault(chunk_coord(food), set()).add(food)  # noqa: SLF001
 
     session = AISession()
-    for _ in range(5):
+    for _ in range(200):
         _drive(game, session)
+        if game.update(C.TICK_INTERVAL).died:
+            break
 
     print("[M3-BLOCKED] blocked_l1=", session.stats["blocked_l1"],
-          "follow=", session.stats["follow_tail"])
+          "follow=", session.stats["follow_tail"],
+          "final_state=", game.state, "score=", game.score, "ticks=", game.ticks)
     assert session.stats["blocked_l1"] >= 1, "应被一级校验拦下"
+    assert game.state == "running", "放弃危险食物后应继续存活"
 
 
 # ---------- 3. 人为无解：兜底 ----------
