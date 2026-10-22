@@ -50,6 +50,11 @@ jobs:
           echo "====== 确认 Java 版本 ======"
           java -version
           
+          echo "====== 设置 Buildozer 环境变量 ======"
+          # 显式指定 SDK 和 NDK 路径，避免 buildozer 自动下载时出错
+          export ANDROIDSDK="$HOME/.buildozer/android/platform/android-sdk"
+          export ANDROIDNDK="$HOME/.buildozer/android/platform/android-ndk-r28c"
+          
           echo "====== 修复 SDK 路径 (伪造 sdkmanager) ======"
           SDK_DIR="$HOME/.buildozer/android/platform/android-sdk"
           mkdir -p "$SDK_DIR"
@@ -77,7 +82,9 @@ jobs:
             sudo ln -sf /usr/bin/aidl "$SDK_DIR/build-tools/$v/aidl"
           done
           
-          echo "====== 开始打包 ======"
+          echo "====== 清理旧构建并开始打包 ======"
+          # 清理可能残留的旧构建文件，避免缓存干扰
+          buildozer android clean || true
           buildozer -v android debug 2>&1 | tee buildozer-debug.log
 
       - name: Verify APK packaging rules
