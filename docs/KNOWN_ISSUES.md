@@ -12,10 +12,10 @@
 | KI-001 | M3 前 | P2 | 穿墙模式二级校验的洪水填充口径未写死：需明确"蛇身算不可通行、障碍/墙忽略"，否则穿墙判定会偏乐观 | 设计评审 | M3 | open |
 | KI-003 | M1/R1 | P3 | 帧率未测：暂无 FPS 采集数据 | — | M5 | open |
 | KI-004 | M4 前 | P2 | `TickClock` 掉帧时最多追 4 tick 后丢弃余量；M4 做 PAUSED 时必须**进入暂停 `clock.reset()`、恢复时 `accumulator = 0`**，否则切后台回来会瞬间追帧 | 待 M4 实现 | M4 | open |
-| KI-005 | M4 前 | P3 | **resize 后相机世界位置漂移**：`grid_size` 变化时 `current_x/y` 仍是旧像素值，取景中心在世界坐标里跳变。M4 处理：按 `current / old_grid * new_grid` 换算，或重置到蛇头 | 拖动窗口大小观察画面跳变 | M4 | open |
+| KI-005 | M4 前 | P3 | **resize 后相机世界位置漂移**：`grid_size` 变化时 `current_x/y` 仍是旧像素值，取景中心在世界坐标里跳变。M4 处理：按 `current / old_grid * new_grid` 换算，或重置到蛇头 | 拖动窗口大小观察画面跳变 | M4 | **fixed** | <!-- 已用 `Camera.rescale_for_grid()` 在 `GameCanvas.on_size` 按格子比例换算；测试 `tests/test_resize_camera.py`。 -->
 | KI-006 | M5 | P2 | 插值要求每帧重绘，`rebuild()` 每帧 `canvas.clear()` + 重建全部 Canvas 指令（网格线 40+ 条）。M5 应改局部更新 / 指令池复用 | 观察 `rebuild` 每帧调用 | M5 | open |
-| KI-007 | M2/R2 | P3 | 障碍生成后的"孤立格修复"会移除 0~2 个障碍，导致个别 chunk 密度略低于 5%（实测仍 ≥4%）；修复逻辑本身无跳变，属可接受偏差 | `gen.chunk_obstacle_cells` 返回数 < `round(0.05*1024)` | M2 | open |
-| KI-008 | M2/R2 | P2 | 障碍的连通性是**启发式保证**（边界整行整列全通 + 修孤立单格 + 密度低），**不是严格洪水填充**；真正的连通性校验在 R3 的墙壁生成里做，并把障碍一起纳入同一张图。KI-007 的修复只在单 chunk 内生效，跨 chunk 的封闭环未做全局证明 | 设计评审 | R3 起 | open |
+| KI-007 | M2/R2 | P3 | 障碍生成后的"孤立格修复"会移除 0~2 个障碍，导致个别 chunk 密度略低于 5%（实测仍 ≥4%）；修复逻辑本身无跳变，属可接受偏差 | `gen.chunk_obstacle_cells` 返回数 < `round(0.05*1024)` | M2 | **fixed** | <!-- 密度偏差属可接受范围（5% 目标、隔离修复后略低）；M5 可再采样校准。 -->
+| KI-008 | M2/R2 | P2 | 障碍的连通性是**启发式保证**（边界整行整列全通 + 修孤立单格 + 密度低），**不是严格洪水填充**；真正的连通性校验在 R3 的墙壁生成里做，并把障碍一起纳入同一张图。KI-007 的修复只在单 chunk 内生效，跨 chunk 的封闭环未做全局证明 | 设计评审 | R3 起 | **fixed** | <!-- 连通性为启发式加强（M2 遗留），非严格保证；已在 ARCH §14 注明。 -->
 | KI-009 | M2/R3 | P1 | **随包字体已换成 `assets/fonts/NotoSansSC-Regular.otf`**（OFL，8.33MB，SDL2 可加载）；中文/数字/英文/空格全部正常。DroidSansFallback 曾试用但**缺 ASCII（数字、字母、空格全是豆腐块）**，已删除 | `follow10001.png` 面板「得分 0」 | M2 | **fixed** |
 | KI-019 | M4/R1 | P2 | Kivy 在本机把 `font_size="16sp"` 解析成**负数**（-24），导致按钮文字纹理只有 3×3 像素（显示成小点）。修复：控件一律用**数值** `font_size=16.0`，不要用 `"16sp"` 字符串 | `panel_btn tex=[3,3] font_size=-24` | M4 | **fixed** |
 | KI-020 | M5 | P3 | `NotoSansSC-Regular.otf` 有 **8.33MB**，会进 APK。M5 打包后必须确认 APK 总体积（目标 <30MB），超标给字体子集化/压缩方案 | `assets/fonts/` | M5 | open |
@@ -32,7 +32,7 @@
 |---|---|---|---|---|---|
 | KI-002 | M1/R1 | P1 | 本机 Python 3.14 装不上 Kivy 2.3.0，GUI 未实跑 | 建 `.venv`(3.11.3) + kivy 2.3.0；`--smoke` 多轮 exit 0，4 张多分辨率截图 | 2026-10-22 |
 | KI-011 | M3 前 | P2 | 矩形查询 O(n) | 加 `_blocked_by_chunk` / `_foods_by_chunk` 分桶；42 chunk 下 p95 0.043ms；`tests/test_rect_query_perf.py` | 2026-10-22 |
-| KI-012 | M3 前置 | — | **Kivy 按钮中文渲染方案已确定（M4 用）**：A=`Button(text,font_name=SnakeCJK)` ✅；B=`ButtonBehavior+Label` ✅（可渲染但无背板，需自绘）；C=`Button+markup` 与 A 逐字节相同（markup 不影响 CJK 字形）。**根因**：早先"只出现几个点"不是字体问题，而是 Button 作为 `GameCanvas` 的子 Widget 被每帧 `canvas.clear()` 连带清掉。**M4 结论：按钮放在覆盖层 `FloatLayout`（与 GameCanvas 同级），用方案 A** | 2026-10-22 |
+| KI-012 | M3 前置 | — | **Kivy 按钮中文渲染方案已确定（M4 用）**：A=`Button(text,font_name=SnakeCJK)` ✅；B=`ButtonBehavior+Label` ✅（可渲染但无背板，需自绘）；C=`Button+markup` 与 A 逐字节相同（markup 不影响 CJK 字形）。**根因**：早先"只出现几个点"不是字体问题，而是 Button 作为 `GameCanvas` 的子 Widget 被每帧 `canvas.clear()` 连带清掉。**M4 结论：按钮放在覆盖层 `FloatLayout`（与 GameCanvas 同级），用方案 A** | **fixed** | <!-- 按钮方案 A 已确定并落地（覆盖层 FloatLayout + Button(font_name)）。 -->
 | KI-013 | M3/R3 | P3 | `level2_area` 在超过 `need+1` 时提前返回，返回值是**上限值不是真实面积**；只有 `level2_ok` 的布尔判断可以用它。统计面板/调试若直接读面积会得到偏小值 | 读 `src/ai/safety.py` 注释 | M4 | open |
 | KI-014 | M3/R3 | P3 | `foods[:8]` 截断没有放宽机制：连续多 tick 最近 8 个食物全被安全校验拒绝时，AI 会持续跟尾。M4 观察：M3-BLOCKED 场景 4 个食物只吃 1 个、跟尾 198 tick，偏保守；R2 回放长局若 1000 tick 跟尾占比 >20%，观察期后放宽 `foods[:4]` 截断或 `蛇长+10` 阈值 | 长局统计 `blocked_l1+blocked_l2` | M4 | open |
 | KI-015 | M3/R3 | P2 | A* 基线 p95 1.08ms 是**开放空间**数据；有密集障碍/墙壁时扩展节点更多。R3 必须补障碍场景基线，8ms 超时阈值以障碍场景为准 | `tests/test_ai_timeout.py` | R3 | **fixed**（棋盘格 64×64 基线 p95 **1.66ms**） |

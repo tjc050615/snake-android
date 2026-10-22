@@ -588,13 +588,7 @@ class SnakeApp(App):
             driver = self.replay_driver
             if driver is not None:
                 driver.advance(dt)
-                done = driver.progress()[0]
-                if driver.finished:
-                    self.canvas_widget.overlay_text = driver.end_text()
-                else:
-                    self.canvas_widget.overlay_text = (
-                        f"{strings.t('replay')} {done}/{driver.progress()[1]}"
-                    )
+                self.canvas_widget.overlay_text = driver.overlay_text()
                 if getattr(self, "replay_overlay", None) is not None:
                     self.replay_overlay.refresh()
             self.canvas_widget.rebuild()

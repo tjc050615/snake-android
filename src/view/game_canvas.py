@@ -295,6 +295,21 @@ class GameCanvas(Widget):
         self._touch_uid = None
         return True
 
+    def on_size(self, *args) -> None:
+        """窗口 resize：按格子尺寸比例换算相机，避免画面漂移（KI-005）。"""
+        super().on_size(*args)
+        cam = getattr(self, "camera", None)
+        vp = getattr(self, "viewport", None)
+        if cam is None or vp is None or self.width <= 0 or self.height <= 0:
+            return
+        from core.camera import rescale_for_grid
+
+        old = vp.grid_size
+        new = fit_grid_size(self.width, self.height)
+        if new != old:
+            rescale_for_grid(cam, old, new)
+            self.rebuild()
+
     def set_theme(self, name: str) -> None:
         self.colors = palette(name)
         self.rebuild()

@@ -74,6 +74,15 @@ class ReplayDriver:
     def progress(self) -> tuple[int, int]:
         return self.controls.tick, self.controls.total
 
+    def overlay_text(self) -> str:
+        """同一帧返回正确文案：已结束立刻显示"回放结束"。"""
+        if self.finished:
+            return self.end_text()
+        done, total = self.progress()
+        from app import strings
+
+        return f"{strings.t('replay')} {done}/{total}"
+
     def end_text(self) -> str:
         from app import strings
 

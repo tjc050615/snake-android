@@ -122,3 +122,18 @@ class Camera:
             self.current_y = self.target_y
         else:
             self.current_y += (self.target_y - self.current_y) * alpha
+
+
+def rescale_for_grid(camera, old_grid: float, new_grid: float) -> None:
+    """窗口/resize 后按格子尺寸比例换算相机位置（KI-005：避免画面漂移）。
+
+    old_grid/new_grid 是缩放前后的 grid_size（像素/格）。比例无效时退化为
+    重新对准蛇头由调用方处理。
+    """
+    if not old_grid or not new_grid or old_grid <= 0 or new_grid <= 0:
+        return
+    ratio = float(new_grid) / float(old_grid)
+    camera.current_x *= ratio
+    camera.current_y *= ratio
+    camera.target_x *= ratio
+    camera.target_y *= ratio

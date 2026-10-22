@@ -45,6 +45,8 @@ class Recorder:
                 self.stopped = True
                 self.capped = True
                 return
+            while len(self.decisions) < self.ticks:  # 切换前的 tick 用占位符对齐
+                self.decisions.append('?')
             self.decisions.append(chr(65 + DIR_CODE.get(direction, 1)))
         else:
             if direction != self._last_dir:
@@ -101,7 +103,9 @@ class Player:
     def direction_at(self, tick: int) -> tuple[int, int] | None:
         if self.mode_at(tick) == MODE_AI:
             if tick < len(self.decisions):
-                return CODE_DIR.get(ord(self.decisions[tick]) - 65, (1, 0))
+                code = self.decisions[tick]
+                if code in "ABCD":
+                    return CODE_DIR[ord(code) - 65]
             return None
         code = None
         for t, v in self._input_iter:
