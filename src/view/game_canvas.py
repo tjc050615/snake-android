@@ -14,6 +14,7 @@ from kivy.uix.widget import Widget
 
 from app import constants as C
 from app import strings
+from app.theme import palette
 from app.fonts import font_name
 from core.camera import Camera
 from core.game import Game
@@ -43,6 +44,9 @@ class GameCanvas(Widget):
         self.too_small = False
         self._resize_event: ClockEvent | None = None
         self.ai_path: list[tuple[int, int]] = []  # M3：AI 路径（半透明折线）
+        self.colors = palette("dark")
+        self.show_grid = True
+        self.head_highlight = True
         self._joystick = Joystick()
         self.joy_radius = 90.0
         self.on_direction = None          # 回调：direction -> None
@@ -175,19 +179,20 @@ class GameCanvas(Widget):
 
         g = vp.grid_size
         with self.canvas:
-            Color(*BG_COLOR)
+            Color(*self.colors["bg"])
             Rectangle(pos=self.pos, size=self.size)
 
-            Color(*GRID_COLOR)
+            Color(*self.colors["grid"])
             x0, y0, x1, y1 = vp.visible_bounds()
-            for gx in range(x0, x1 + 1):
-                sx = gx * g - vp.origin_x
-                Line(points=[sx, 0, sx, self.height], width=1)
-            for gy in range(y0, y1 + 1):
-                sy = gy * g - vp.origin_y
-                Line(points=[0, sy, self.width, sy], width=1)
+            if self.show_grid:
+                for gx in range(x0, x1 + 1):
+                    sx = gx * g - vp.origin_x
+                    Line(points=[sx, 0, sx, self.height], width=1)
+                for gy in range(y0, y1 + 1):
+                    sy = gy * g - vp.origin_y
+                    Line(points=[0, sy, self.width, sy], width=1)
 
-            Color(*FOOD_COLOR)
+            Color(*self.colors["food"])
             food = g * 0.5
             pad = (g - food) / 2.0
             for cell in vp.iter_visible_cells():
@@ -198,13 +203,13 @@ class GameCanvas(Widget):
             # 障碍与墙壁（R3）：只画视口内；墙壁用暖色 + 内缩边框区分
             from core.world import BLOCK_WALL
 
-            Color(*OBSTACLE_COLOR)
+            Color(*self.colors["obstacle"])
             for cell in vp.iter_visible_cells():
                 if self.game.world.is_blocked(cell) and self.game.world.block_kind(cell) != BLOCK_WALL:
                     rx, ry, w, h = vp.cell_rect(cell)
                     Rectangle(pos=(rx + 2, ry + 2), size=(w - 4, h - 4))
 
-            Color(*WALL_COLOR)
+            Color(*self.colors["wall"])
             for cell in vp.iter_visible_cells():
                 if self.game.world.block_kind(cell) == BLOCK_WALL:
                     rx, ry, w, h = vp.cell_rect(cell)
@@ -212,7 +217,7 @@ class GameCanvas(Widget):
 
             # AI 路径：画在蛇身下层、半透明浅蓝（R3）；只画视口内的连续段（R4 裁剪）
             if self.ai_path:
-                Color(0.45, 0.75, 1.0, 0.35)
+                Color(*self.colors['path'])
                 run: list[float] = []
                 for cell in self.ai_path:
                     visible = vp.covers(cell)
@@ -230,7 +235,7 @@ class GameCanvas(Widget):
             cells = segment_cells(self.game.snake, self.game.tick_progress)
             pad_snake = 1.0
 
-            Color(*BODY_COLOR)
+            Color(*self.colors["body"])
             for cell in cells[1:]:
                 px, py = to_pixel(cell, g, vp.origin_x, vp.origin_y)
                 if -g <= px <= self.width + g and -g <= py <= self.height + g:
@@ -239,15 +244,19 @@ class GameCanvas(Widget):
                         size=(g - 2 * pad_snake, g - 2 * pad_snake),
                     )
 
-            Color(*HEAD_COLOR)
+            Color(*self.colors["head"])
             hx, hy = to_pixel(cells[0], g, vp.origin_x, vp.origin_y)
             Rectangle(
                 pos=(hx - g / 2 + pad_snake, hy - g / 2 + pad_snake),
                 size=(g - 2 * pad_snake, g - 2 * pad_snake),
             )
+            if self.head_highlight:
+                # 可访问性：蛇头外圈高亮描边
+                Color(1.0, 1.0, 1.0, 0.85)
+                Line(rectangle=(hx - g / 2 + 1, hy - g / 2 + 1, g - 2, g - 2), width=2)
 
             if self.game.state == "dead":
-                Color(*DEAD_TINT)
+                Color(*self.colors["dead_tint"])
                 Rectangle(pos=self.pos, size=self.size)
 
             if self._status_text:
@@ -282,6 +291,15 @@ class GameCanvas(Widget):
         self._joystick.end()
         self._touch_uid = None
         return True
+
+    def set_theme(self, name: str) -> None:
+        self.colors = palette(name)
+        self.rebuild()
+
+    def apply_view_options(self, show_grid: bool, head_highlight: bool) -> None:
+        self.show_grid = bool(show_grid)
+        self.head_highlight = bool(head_highlight)
+        self.rebuild()
 
     # ---------- 虚拟摇杆（M4/R1） ----------
     def joystick_center(self) -> tuple[float, float]:

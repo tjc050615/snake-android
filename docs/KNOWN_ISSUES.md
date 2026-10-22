@@ -18,6 +18,8 @@
 | KI-008 | M2/R2 | P2 | 障碍的连通性是**启发式保证**（边界整行整列全通 + 修孤立单格 + 密度低），**不是严格洪水填充**；真正的连通性校验在 R3 的墙壁生成里做，并把障碍一起纳入同一张图。KI-007 的修复只在单 chunk 内生效，跨 chunk 的封闭环未做全局证明 | 设计评审 | R3 起 | open |
 | KI-009 | M2/R3 | P1 | **随包字体已换成 `assets/fonts/NotoSansSC-Regular.otf`**（OFL，8.33MB，SDL2 可加载）；中文/数字/英文/空格全部正常。DroidSansFallback 曾试用但**缺 ASCII（数字、字母、空格全是豆腐块）**，已删除 | `follow10001.png` 面板「得分 0」 | M2 | **fixed** |
 | KI-019 | M4/R1 | P2 | Kivy 在本机把 `font_size="16sp"` 解析成**负数**（-24），导致按钮文字纹理只有 3×3 像素（显示成小点）。修复：控件一律用**数值** `font_size=16.0`，不要用 `"16sp"` 字符串 | `panel_btn tex=[3,3] font_size=-24` | M4 | **fixed** |
+| KI-020 | M5 | P3 | `NotoSansSC-Regular.otf` 有 **8.33MB**，会进 APK。M5 打包后必须确认 APK 总体积（目标 <30MB），超标给字体子集化/压缩方案 | `assets/fonts/` | M5 | open |
+| KI-021 | M5 | P3 | KI-019 的 `"16sp"` → 负数疑似**桌面 Kivy** 特有（安卓 Metrics 初始化后 sp 可能正常）。全局已统一数值 font_size，M5 真机确认数值字号显示正常 | `tests/test_ui_layout.py` | M5 | open |
 | KI-010 | M2/R4 | P3 | 已加载 chunk 数量随视口尺寸变化：受控视口（1 chunk + 2 圈）= 30，符合 20~30；但 1280×720（视口跨 2×1 chunk）+ 卸载 3 圈会到 **42**，超出验收区间。收紧到 20~30 需把预加载降到 1 圈或把卸载降到 2 圈（后者会失去滞回带），需拍板 | `--smoke 8` 看 `chunks_loaded` | M2 | **wontfix**（需求偏差已确认，实现不改：ARCH §7.1 已改为 30~45 个 / <1MB；D-005 锁定值不变） |
 | KI-011 | M3 前 | P2 | `World.query_blocked_in_rect` / `foods_in_rect` 目前是 O(n) 遍历 `_blocked`/`_foods`；42 chunk 约 2500 个 blocked cell，M3 的 AI 每一步都调用会把 8ms 预算吃光。M3 开工前改为按 chunk 分桶（`_blocked_by_chunk: dict[key, set]`）或空间哈希，把矩形查询降到 O(命中格数) | M3 性能测试 | M3 | **fixed**（已加 `_blocked_by_chunk`/`_foods_by_chunk`；42 chunk 下 p95 **0.043ms**） |
 
@@ -29,7 +31,7 @@
 | KI-011 | M3 前 | P2 | 矩形查询 O(n) | 加 `_blocked_by_chunk` / `_foods_by_chunk` 分桶；42 chunk 下 p95 0.043ms；`tests/test_rect_query_perf.py` | 2026-10-22 |
 | KI-012 | M3 前置 | — | **Kivy 按钮中文渲染方案已确定（M4 用）**：A=`Button(text,font_name=SnakeCJK)` ✅；B=`ButtonBehavior+Label` ✅（可渲染但无背板，需自绘）；C=`Button+markup` 与 A 逐字节相同（markup 不影响 CJK 字形）。**根因**：早先"只出现几个点"不是字体问题，而是 Button 作为 `GameCanvas` 的子 Widget 被每帧 `canvas.clear()` 连带清掉。**M4 结论：按钮放在覆盖层 `FloatLayout`（与 GameCanvas 同级），用方案 A** | 2026-10-22 |
 | KI-013 | M3/R3 | P3 | `level2_area` 在超过 `need+1` 时提前返回，返回值是**上限值不是真实面积**；只有 `level2_ok` 的布尔判断可以用它。统计面板/调试若直接读面积会得到偏小值 | 读 `src/ai/safety.py` 注释 | M4 | open |
-| KI-014 | M3/R3 | P3 | `foods[:8]` 截断没有放宽机制：连续多 tick 最近 8 个食物全被安全校验拒绝时，AI 会持续跟尾。M4 观察长局后再决定是否加"连续 N 次全不安全 → 扩到 16" | 长局统计 `blocked_l1+blocked_l2` | M4 | open |
+| KI-014 | M3/R3 | P3 | `foods[:8]` 截断没有放宽机制：连续多 tick 最近 8 个食物全被安全校验拒绝时，AI 会持续跟尾。M4 观察：M3-BLOCKED 场景 4 个食物只吃 1 个、跟尾 198 tick，偏保守；R2 回放长局若 1000 tick 跟尾占比 >20%，观察期后放宽 `foods[:4]` 截断或 `蛇长+10` 阈值 | 长局统计 `blocked_l1+blocked_l2` | M4 | open |
 | KI-015 | M3/R3 | P2 | A* 基线 p95 1.08ms 是**开放空间**数据；有密集障碍/墙壁时扩展节点更多。R3 必须补障碍场景基线，8ms 超时阈值以障碍场景为准 | `tests/test_ai_timeout.py` | R3 | **fixed**（棋盘格 64×64 基线 p95 **1.66ms**） |
 | KI-016 | M3/R4 | P2 | **决策生效语义**：R3 的 `session.tick` 是"同 tick 消费"（B），与注释/ARCH 的"下一 tick 生效"矛盾。实测真延迟一 tick 会让路径随蛇头位移失效（79 tick 就死）→ **采用方案 B 并改文档**：方向作用于本次 step，`Snake.pending` 天然延迟一步；ARCH §15 已同步 | `--ai` 长局 | R3 | **fixed**（文档对齐，不做人为延迟） |
 | KI-017 | M3/R4 | P2 | 决策耗时：`timeouts` 占比应 <5%；**峰值曾 10.6ms 超 8ms**（两级 BFS 无 deadline）。已修：level1/level2 加 deadline（超时保守拒绝）、A* 与 BFS 共用预算、session 预算 7ms（留 1ms 抖动余量）。实测 1000 tick：p50 1.48ms、p99 **7.35ms**、max 7.57ms | `tests/test_ai_budget.py` | R3 | **fixed** |

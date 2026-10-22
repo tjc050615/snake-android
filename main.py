@@ -87,6 +87,12 @@ def main() -> int:
     app.spawn_shot = "--spawnshot" in sys.argv
     app.ai = "--ai" in sys.argv
     app.clip_demo = "--clipdemo" in sys.argv
+    app.settings_shot = "--settings" in sys.argv
+    for _arg in sys.argv:
+        if _arg.startswith("--theme="):
+            app.theme_override = _arg.split("=", 1)[1]
+        elif _arg.startswith("--font="):
+            app.font_override = float(_arg.split("=", 1)[1])
     app.speed = _parse_speed(sys.argv)
     app.window_size = _parse_size(sys.argv)
     app.run()

@@ -29,11 +29,13 @@ from app import constants as C
 from app import strings
 from app.fonts import font_name, register_fonts
 from core.chunk_manager import ChunkManager
+from data.storage import ConfigStore
 from core.game import Game
 from core.snake import DIR_DOWN, DIR_LEFT, DIR_RIGHT, DIR_UP, Snake
 from platform_layer import desktop
 from view.game_canvas import GameCanvas
 from view.panel import Panel
+from view.settings_panel import SettingsOverlay
 
 DEFAULT_SEED = 20261022
 FRAME_INTERVAL = 1.0 / 60.0
@@ -67,11 +69,20 @@ class SnakeApp(App):
     spawn_shot = False
     ai = False
     clip_demo = False
+    settings_shot = False
+    theme_override: str | None = None
+    font_override: float | None = None
 
     # ---------- 构建 ----------
     def build(self) -> GameCanvas:
         register_fonts()  # Kivy 默认字体不含中文，必须先注册随包字体
         self._apply_window_size()
+        self.store = ConfigStore()
+        self.cfg = self.store.load()
+        if self.theme_override:
+            self.cfg["theme"] = self.theme_override
+        if self.font_override:
+            self.cfg["font_size"] = self.font_override
         self.game = Game(DEFAULT_SEED)
         self.game.clock.set_speed(self.speed)
         self._foods0 = self.game.world.food_count()
@@ -89,13 +100,22 @@ class SnakeApp(App):
         self.canvas_widget.pos_hint = {"x": 0, "y": 0}
         self.canvas_widget.on_direction = self._on_direction
 
-        self.panel = Panel(self.game, on_wrap=self._toggle_wrap, on_restart=self._restart)
+        self.panel = Panel(
+            self.game, on_wrap=self._toggle_wrap, on_restart=self._restart,
+            on_settings=self._open_settings,
+        )
         self.panel.size_hint = (0.30, 1.0)
         self.panel.pos_hint = {"right": 1, "y": 0}
+
+        self.canvas_widget.set_theme(self.cfg.get("theme", "dark"))
+        self.canvas_widget.apply_view_options(
+            self.cfg.get("show_grid", True), self.cfg.get("head_highlight", True)
+        )
 
         root = FloatLayout()
         root.add_widget(self.canvas_widget)
         root.add_widget(self.panel)
+        self.root_layout = root
         # 布局完成后再刷一次文案：面板首次创建时宽度为 0，纹理会按 0 宽缓存
         Clock.schedule_once(lambda _dt: self.panel.refresh(), 0.05)
 
@@ -129,6 +149,9 @@ class SnakeApp(App):
                     )
             if self.spawn_shot:
                 Clock.schedule_once(lambda _dt: self._shot("spawn"), 0.8)
+            if self.settings_shot:
+                Clock.schedule_once(lambda _dt: self._open_settings(), 0.4)
+                Clock.schedule_once(lambda _dt: self._shot("settings"), 1.0)
             if self.clip_demo:
                 Clock.schedule_once(self._setup_clip_scene, 0.2)
                 Clock.schedule_once(lambda _dt: self._shot("clip"), 0.8)
@@ -138,6 +161,34 @@ class SnakeApp(App):
             Clock.schedule_once(self._smoke_final, max(0.5, self.smoke_seconds - 0.05))
             Clock.schedule_once(lambda _dt: self.stop(), self.smoke_seconds)
         return root
+
+    # ---------- 设置 ----------
+    def _open_settings(self) -> None:
+        if getattr(self, "settings_overlay", None) is not None:
+            return
+        self.settings_overlay = SettingsOverlay(
+            self.cfg, on_change=self._on_settings_change, on_close=self._close_settings,
+        )
+        self.settings_overlay.size_hint = (0.30, 1.0)
+        self.settings_overlay.pos_hint = {"right": 1, "y": 0}
+        self.root_layout.add_widget(self.settings_overlay)
+        self.panel.opacity = 0
+        self.panel.disabled = True
+
+    def _close_settings(self) -> None:
+        overlay = getattr(self, "settings_overlay", None)
+        if overlay is not None:
+            self.root_layout.remove_widget(overlay)
+            self.settings_overlay = None
+        self.panel.opacity = 1
+        self.panel.disabled = False
+
+    def _on_settings_change(self, cfg: dict) -> None:
+        self.cfg = self.store.save(cfg)
+        self.canvas_widget.set_theme(self.cfg.get("theme", "dark"))
+        self.canvas_widget.apply_view_options(
+            self.cfg.get("show_grid", True), self.cfg.get("head_highlight", True)
+        )
 
     # ---------- 面板按钮回调 ----------
     def _toggle_wrap(self) -> None:

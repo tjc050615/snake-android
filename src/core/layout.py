@@ -25,3 +25,12 @@ def in_rect(rect: tuple[float, float, float, float], x: float, y: float) -> bool
     rx, ry, rw, rh = rect
     return rx <= x < rx + rw and ry <= y < ry + rh
 
+
+ROW_H = 56.0
+
+
+def content_height(item_count: int, font_size: float) -> float:
+    """设置面板内容高度估算：行高随字号线性放大（纯函数，便于验收可滚动）。"""
+    scale = max(1.0, font_size / 16.0)
+    return item_count * (ROW_H * scale) + 24.0
+
