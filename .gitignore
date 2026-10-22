@@ -1,0 +1,7 @@
+.venv/
+.kivyhome/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.log
+*.mp3
