@@ -84,3 +84,32 @@
 | 蛇身增量绘制（只画变化格） | 与插值渲染冲突（每帧蛇身位置连续变化），收益低 |
 | 异步 chunk 生成（线程） | 引入锁与确定性风险，R5B 真机数据若显示卡顿再评估 |
 | AI 多线程 | 7ms 已满足预算，收益低 |
+
+
+## 8. R5A 优化结果（已完成）
+
+| 优化项 | 改前 | 改后 | 验证 |
+|---|---|---|---|
+| 蛇身插值缓冲 | 每帧新建 result list（1 次/帧） | 传入 `out` 复用，10 帧 0 新建 | `test_segment_cells_reuses_buffer`、`test_rebuild_no_new_list_per_frame` |
+| `cells[1:]` 切片 | 每帧额外 1 个切片 list | 改索引循环 `range(1, len(cells))`，0 切片 | `test_rebuild_no_new_list_per_frame` |
+| AI / chunk 错峰 | 跨 chunk 帧可能 AI + chunk 叠加（最坏 18.0ms） | AI 决策帧跳过 chunk，最坏 15.5ms | `test_ai_and_chunk_not_same_frame`、`test_frame_budget_under_16ms` |
+| 高速无空白 | — | 10x、每两帧生成一次，500 帧内 chunk 覆盖始终 ≥ 视口+1 圈 | `test_ai_chunk_stagger_no_gap_at_high_speed`（预热后 500 帧） |
+| 帧预算（典型档） | 无 | 8.1ms < 12ms | `test_frame_budget_typical_under_12ms` |
+| 帧预算（最坏档） | 直接相加 18.0ms 超预算 | 错峰后 `2.0 + max(7.5,2.5) + 1.0 + 5.0 = 15.5ms` < 16.67ms | `test_frame_budget_under_16ms` |
+
+**每帧新建 list 数**：改前 2（`segment_cells` 结果 + `cells[1:]` 切片）→ 改后 1（`segment_cells` 内部 `list(snake.body)`，为 O(1) 下标访问保留，见下）。
+
+### 未做的原因
+
+| 项 | 原因 |
+|---|---|
+| `list(snake.body)` | 蛇身是 `deque`，按下标随机访问是 O(n)，逐帧 `list()` 换 O(1) 访问；若去掉了，长蛇时插值会退化成 O(n²)。**结论：保留一次分配更好** |
+| FBO 缓存背景/网格 | R5B 真机帧时间后再评估（避免为未知收益引入 rebuild 复杂度） |
+| 异步 chunk / 多线程 AI | 7ms 预算已满足；异步会引入锁与确定性风险 |
+
+### 测试总览
+
+`python -m pytest -q` → **372 passed, 1 skipped**
+
+新增：`tests/test_r5a_perf.py`（6 条：缓冲复用、无切片、错峰、无空白、典型/最坏帧预算）。
+保留：`test_chunk_generation_budget_p95_under_3ms`、`test_ai_tick_budget_p99_under_8ms`。

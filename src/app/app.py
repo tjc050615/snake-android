@@ -44,6 +44,7 @@ from data.onboarding import mark_done, should_show
 from core.debug import DebugStats
 from core.audio import Haptics, SoundManager
 from core.confirm import ConfirmState
+from core.frame_budget import chunk_slot
 from core.replay import Recorder
 from core.replay_player import ReplayDriver
 from core.replay_controls import ReplayControls
@@ -603,7 +604,9 @@ class SnakeApp(App):
             return
         summary = self.game.update(dt)
         camera_moved = self.canvas_widget.advance(dt)
-        self._update_chunks()
+        had_ai_tick = bool(self.session is not None and summary.ticks)
+        if chunk_slot(had_ai_tick=had_ai_tick):
+            self._update_chunks()   # R5A 错峰：AI 决策帧不生成 chunk
         if summary.ticks or summary.died:
             self.recorder.tick(self.game.snake.direction)
             self.panel.refresh()

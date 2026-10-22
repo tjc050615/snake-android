@@ -45,6 +45,7 @@ class GameCanvas(Widget):
         self._resize_event: ClockEvent | None = None
         self.ai_path: list[tuple[int, int]] = []  # M3：AI 路径（半透明折线）
         self.overlay_text = ""                    # 暂停倒计时 / 回放提示
+        self._cells_buf: list = []                 # R5A：蛇身插值缓冲复用
         self.colors = palette("dark")
         self.show_grid = True
         self.head_highlight = True
@@ -233,11 +234,12 @@ class GameCanvas(Widget):
                     Line(points=run, width=2)
 
             # 蛇身：浮点格坐标 → 像素，矩形以格中心为锚点
-            cells = segment_cells(self.game.snake, self.game.tick_progress)
+            cells = segment_cells(self.game.snake, self.game.tick_progress, self._cells_buf)
             pad_snake = 1.0
 
             Color(*self.colors["body"])
-            for cell in cells[1:]:
+            for idx in range(1, len(cells)):
+                cell = cells[idx]
                 px, py = to_pixel(cell, g, vp.origin_x, vp.origin_y)
                 if -g <= px <= self.width + g and -g <= py <= self.height + g:
                     Rectangle(

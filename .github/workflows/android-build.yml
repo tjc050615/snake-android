@@ -49,11 +49,14 @@ jobs:
           APK=$(ls bin/*.apk | head -n1)
           echo "APK=$APK"
           unzip -l "$APK" | tee apk-contents.txt
-          if unzip -l "$APK" | grep -E "(^|/)(tests|docs|tools)/"; then
+          if unzip -l "$APK" | grep -E "(^|/)tests/|(^|/)docs/|(^|/)tools/"; then
             echo "::error::APK 内包含 tests/docs/tools，须检查 source.exclude_dirs"
             exit 1
           fi
-          unzip -l "$APK" | grep -q "NotoSansSC-Regular.otf" || (echo "::error::字体未进 APK"; exit 1)
+          if ! unzip -l "$APK" | grep -q "NotoSansSC-Regular.otf"; then
+            echo "::error::字体未进 APK"
+            exit 1
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
