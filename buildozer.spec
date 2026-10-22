@@ -1,4 +1,5 @@
 [app]
+version = 0.1
 title = Snake Android
 package.name = snake
 package.domain = org.example
