@@ -29,7 +29,13 @@ class Game:
 
     def __init__(self, seed: int = 0) -> None:
         self.seed = int(seed)
+        # 穿墙模式（D-025）：True 时忽略障碍/墙壁，但自撞仍然死
+        self.wrap_mode = False
         self.reset(self.seed)
+
+    # ---------- 模式 ----------
+    def set_wrap_mode(self, enabled: bool) -> None:
+        self.wrap_mode = bool(enabled)
 
     # ---------- 生命周期 ----------
     def reset(self, seed: int | None = None) -> None:
@@ -72,7 +78,7 @@ class Game:
 
     def _tick(self):
         self.ticks += 1
-        result = self.snake.step(self.world)
+        result = self.snake.step(self.world, ignore_blocked=self.wrap_mode)
         if result.ate:
             self.score += 1
         if result.died:

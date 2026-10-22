@@ -14,6 +14,11 @@
 | KI-004 | M4 前 | P2 | `TickClock` 掉帧时最多追 4 tick 后丢弃余量；M4 做 PAUSED 时必须**进入暂停 `clock.reset()`、恢复时 `accumulator = 0`**，否则切后台回来会瞬间追帧 | 待 M4 实现 | M4 | open |
 | KI-005 | M4 前 | P3 | **resize 后相机世界位置漂移**：`grid_size` 变化时 `current_x/y` 仍是旧像素值，取景中心在世界坐标里跳变。M4 处理：按 `current / old_grid * new_grid` 换算，或重置到蛇头 | 拖动窗口大小观察画面跳变 | M4 | open |
 | KI-006 | M5 | P2 | 插值要求每帧重绘，`rebuild()` 每帧 `canvas.clear()` + 重建全部 Canvas 指令（网格线 40+ 条）。M5 应改局部更新 / 指令池复用 | 观察 `rebuild` 每帧调用 | M5 | open |
+| KI-007 | M2/R2 | P3 | 障碍生成后的"孤立格修复"会移除 0~2 个障碍，导致个别 chunk 密度略低于 5%（实测仍 ≥4%）；修复逻辑本身无跳变，属可接受偏差 | `gen.chunk_obstacle_cells` 返回数 < `round(0.05*1024)` | M2 | open |
+| KI-008 | M2/R2 | P2 | 障碍的连通性是**启发式保证**（边界整行整列全通 + 修孤立单格 + 密度低），**不是严格洪水填充**；真正的连通性校验在 R3 的墙壁生成里做，并把障碍一起纳入同一张图。KI-007 的修复只在单 chunk 内生效，跨 chunk 的封闭环未做全局证明 | 设计评审 | R3 起 | open |
+| KI-009 | M2/R3 | P1 | **随包字体是 Windows 自带 SimHei 的副本**（`assets/fonts/ChineseFallback.ttf`），仅可用于本地开发；NotoSansSC 下载的 OTF 被 SDL2 文本后端拒绝加载（`Couldn't load font file`）。**发布前必须替换为 OFL 授权的 NotoSansSC/DroidSansFallback TTF**，否则有版权与打包风险 | 检查 `assets/fonts/` | M5 打包前 | open |
+| KI-010 | M2/R4 | P3 | 已加载 chunk 数量随视口尺寸变化：受控视口（1 chunk + 2 圈）= 30，符合 20~30；但 1280×720（视口跨 2×1 chunk）+ 卸载 3 圈会到 **42**，超出验收区间。收紧到 20~30 需把预加载降到 1 圈或把卸载降到 2 圈（后者会失去滞回带），需拍板 | `--smoke 8` 看 `chunks_loaded` | M2 | **wontfix**（需求偏差已确认，实现不改：ARCH §7.1 已改为 30~45 个 / <1MB；D-005 锁定值不变） |
+| KI-011 | M3 前 | P2 | `World.query_blocked_in_rect` / `foods_in_rect` 目前是 O(n) 遍历 `_blocked`/`_foods`；42 chunk 约 2500 个 blocked cell，M3 的 AI 每一步都调用会把 8ms 预算吃光。M3 开工前改为按 chunk 分桶（`_blocked_by_chunk: dict[key, set]`）或空间哈希，把矩形查询降到 O(命中格数) | M3 性能测试 | M3 | open |
 
 ## 已关闭
 

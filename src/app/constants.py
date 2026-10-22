@@ -37,9 +37,11 @@ AI_RADIUS_BASE = 20              # D-021
 AI_RADIUS_MAX = 80               # D-021
 AI_RADIUS_HIGHSPEED_MAX = 40     # D-048
 
-# --- 生成（M1 只有食物，无墙无障碍；D-053）---
+# --- 生成（M2 起：障碍 / 墙壁）---
 FOOD_PER_CHUNK_MIN = 3           # D-030
 FOOD_PER_CHUNK_MAX = 5           # D-030
+OBSTACLE_DENSITY = 0.05          # D-026（约 5%）
+SPAWN_PROTECT_CHUNKS = 1         # D-007：出生点周围 1 圈 → 3×3 = 9 个 chunk 保护
 
 # --- 历史 / 回放（M4）---
 HISTORY_SIZE = 20                # D-031

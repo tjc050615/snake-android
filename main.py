@@ -80,6 +80,11 @@ def main() -> int:
     app.demo = "--demo" in sys.argv
     app.interp = "--interp" in sys.argv
     app.hyst = "--hyst" in sys.argv
+    app.obstacle_shot = "--obstacles" in sys.argv or "--walls" in sys.argv
+    app.wall_shot = "--walls" in sys.argv
+    app.wrap = "--wrap" in sys.argv
+    app.wrap_scene = app.wrap
+    app.spawn_shot = "--spawnshot" in sys.argv
     app.speed = _parse_speed(sys.argv)
     app.window_size = _parse_size(sys.argv)
     app.run()

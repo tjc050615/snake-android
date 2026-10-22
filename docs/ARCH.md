@@ -219,6 +219,11 @@ for axis in (x, y):
 
 中间一圈是滞回带，避免玩家在边界来回移动时反复加载/卸载。
 
+**缓存规模（已确认口径）**：单局同时缓存 **30~45 个 chunk**（视口跨 1~2 个 chunk 时），
+内存 **<1MB**（实测 tracemalloc peak 0.37MB / 30 chunk）。原"20~30 个"是按单 chunk
+视口估算的；1280×720 视口跨 2×1 chunk，稳态必然在 30~42，属于需求内部口径差异，
+实现保持预加载 2 圈 / 卸载 3 圈不变（D-005）。
+
 ### 7.2 生成规则（全部纯函数：同 seed + 同坐标 = 同结果）
 
 | # | 内容 | 生效里程碑 | 规则 |
@@ -341,7 +346,6 @@ grid_size = max(16, round(32 * density))       # 整数，保证像素对齐
 | RK7 | 打包链（SDK/NDK/ABI/target 33）失败成本高 | `buildozer android debug` 报错 | M5 之前先在 M1 做一次空包构建验证；锁 buildozer.spec 版本 |
 
 ## 13. 目录结构
-
 ```
 snake_android/
 ├── main.py                # 入口（把 src/ 加进 sys.path）
@@ -364,3 +368,20 @@ snake_android/
 ```
 
 约定：`docs/` 只放文档，`src/` 只放代码，`tests/` 平铺对应 `core/ai` 的纯逻辑测试（不依赖 Kivy）。
+
+## 14. M3 AI 只读接口（已定稿，M3 开工不再改）
+
+AI 只能通过下列接口访问世界，**禁止直接碰 `_blocked` / `_foods` / `_chunks`**：
+
+| 接口 | 签名 | 语义 |
+|---|---|---|
+| 阻挡查询 | `World.query_blocked_in_rect(x0, y0, x1, y1) -> set[cell]` | 矩形内障碍∪墙壁；含端点，坐标可反序 |
+| 食物查询 | `World.foods_in_rect(x0, y0, x1, y1) -> set[cell]` | 矩形内食物；含端点，坐标可反序 |
+| 通行判定 | `World.is_passable(cell, ignore_blocked=False) -> bool` | 唯一入口；ignore_blocked 只让地形让路 |
+| 蛇身 | `Snake.occupied` / `Snake.head` / `Snake.tail` / `Snake.body` | 只读 |
+| 模式 | `Game.wrap_mode` | 穿墙模式开关 |
+
+约束：
+- 所有查询必须 O(视口规模) 或 O(1)，不允许 AI 遍历全量 `_blocked`。
+- AI 的搜索半径 `min(蛇长+20, 80)` 由调用方保证，接口不做裁剪。
+- 这些签名一旦 M3 开工即冻结；变更需走 DECISIONS 新编号。

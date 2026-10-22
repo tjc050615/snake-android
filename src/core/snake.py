@@ -87,7 +87,13 @@ class Snake:
         return True
 
     # ---------- 步进 ----------
-    def step(self, world) -> StepResult:  # noqa: ANN001 - 避免 core 互相 import
+    def step(self, world, ignore_blocked: bool = False) -> StepResult:  # noqa: ANN001
+        """推进一格。
+
+        Args:
+            world: 提供 `has_food` / `is_passable` / `consume_food`。
+            ignore_blocked: 穿墙模式（D-025）→ 忽略地形阻挡，但**自撞仍然死**。
+        """
         self.prev_tail = self.body[-1]  # 必须在移动前记录
         self.ate_food = False
         self.direction = self.pending  # 本 Tick 生效（D-019 的同构语义：下一 Tick 才动）
@@ -100,8 +106,8 @@ class Snake:
         if new_head in blocking:
             return StepResult(True, False, self.head, len(self.body))
 
-        # M1/R2 恒 True；M2 接入地形后这里才有意义（唯一入口）
-        if not world.is_passable(new_head):
+        # 唯一通行判定点：蛇身自己查（上面 blocking），地形交给 World
+        if not world.is_passable(new_head, ignore_blocked=ignore_blocked):
             return StepResult(True, False, self.head, len(self.body))
 
         if will_eat:
