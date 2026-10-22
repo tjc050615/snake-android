@@ -26,9 +26,10 @@ DEFAULTS: dict = {
     "head_highlight": True,
     "show_grid": True,
     "font_size": 16.0,
+    "screen_awake": True,
 }
 
-THEMES = ("dark", "light")
+THEMES = ("dark", "light", "high_contrast")
 PERF_MODES = ("battery", "balanced", "performance")
 
 
@@ -53,7 +54,7 @@ def validate(raw: dict) -> dict:
     if raw.get("version") != CONFIG_VERSION:
         return cfg  # 版本不符：直接默认（V1 没有迁移需求）
 
-    for key in ("sound_on", "vibrate_on", "show_fps", "head_highlight", "show_grid"):
+    for key in ("sound_on", "vibrate_on", "show_fps", "head_highlight", "show_grid", "screen_awake"):
         if key in raw:
             cfg[key] = bool(raw[key])
 

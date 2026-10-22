@@ -155,17 +155,17 @@ def test_onboarding_shows_once_ever():
 
 # ---------- 暂停倒计时 ----------
 def test_pause_countdown_blocks_input():
+    """R3 语义：暂停不限时；点继续才开始 3-2-1，期间仍屏蔽输入。"""
     gate = PauseGate(3.0)
     gate.pause()
-    assert gate.accept_input() is False
+    gate.update(5.0)
+    assert gate.accept_input() is False, "暂停期间不接受输入"
 
+    gate.request_resume()
+    assert gate.label_seconds() == 3
     gate.update(1.0)
     assert gate.accept_input() is False
     assert gate.label_seconds() == 2
 
-    gate.update(1.0)
-    assert gate.accept_input() is False
-
-    gate.update(1.2)
-    assert gate.remaining == 0.0
-    assert gate.accept_input() is True, "3 秒结束后才恢复输入"
+    gate.update(2.1)
+    assert gate.accept_input() is True, "倒计时结束才恢复输入"

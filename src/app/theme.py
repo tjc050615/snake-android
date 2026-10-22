@@ -30,7 +30,21 @@ LIGHT = {
     "text": (0.10, 0.11, 0.13, 1),
 }
 
-THEMES = {"dark": DARK, "light": LIGHT}
+HIGH_CONTRAST = {
+    "bg": (0.0, 0.0, 0.0, 1),
+    "grid": (0.30, 0.30, 0.30, 1),
+    "food": (1.0, 0.85, 0.0, 1),
+    "body": (0.0, 1.0, 0.4, 1),
+    "head": (1.0, 1.0, 1.0, 1),
+    "obstacle": (0.35, 0.35, 0.35, 1),
+    "wall": (1.0, 0.5, 0.0, 1),
+    "path": (0.0, 0.7, 1.0, 0.55),
+    "dead_tint": (0.6, 0.0, 0.0, 0.45),
+    "panel_bg": (0.02, 0.02, 0.02, 1),
+    "text": (1.0, 1.0, 1.0, 1),
+}
+
+THEMES = {"dark": DARK, "light": LIGHT, "high_contrast": HIGH_CONTRAST}
 
 
 def palette(name: str) -> dict:

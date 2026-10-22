@@ -15,7 +15,7 @@ from kivy.uix.label import Label
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.slider import Slider
 from kivy.uix.spinner import Spinner
-from kivy.uix.switch import Switch
+from kivy.uix.checkbox import CheckBox
 
 from app import strings
 from app.fonts import FONT_NAME
@@ -91,10 +91,11 @@ class SettingsOverlay(BoxLayout):
         return row
 
     def _switch_row(self, key: str) -> None:
+        # KI-023：不用 Kivy Switch（激活态贴图会显示成 NO），统一 CheckBox
         row = self._row(key)
-        sw = Switch(active=bool(self.cfg.get(key)))
-        sw.bind(active=lambda _w, v, k=key: self._set(k, bool(v)))
-        row.add_widget(sw)
+        cb = CheckBox(active=bool(self.cfg.get(key)))
+        cb.bind(active=lambda _w, v, k=key: self._set(k, bool(v)))
+        row.add_widget(cb)
 
     def _slider_row(self, key: str, lo: float, hi: float) -> None:
         row = self._row(key)
@@ -123,7 +124,8 @@ class SettingsOverlay(BoxLayout):
         self._slider_row("vibrate_strength", 0.0, 1.0)
         self._choice_row(
             "theme", THEMES,
-            {"dark": strings.t("theme_dark"), "light": strings.t("theme_light")},
+            {"dark": strings.t("theme_dark"), "light": strings.t("theme_light"),
+             "high_contrast": strings.t("theme_high_contrast")},
         )
         self._switch_row("show_fps")
         self._choice_row(
@@ -138,6 +140,7 @@ class SettingsOverlay(BoxLayout):
         self._slider_row("joystick_deadzone", 0.05, 0.5)
         self._switch_row("head_highlight")
         self._switch_row("show_grid")
+        self._switch_row("screen_awake")
         self._slider_row("font_size", 12.0, 24.0)
 
         btn = Button(text=strings.t("reset_defaults"), font_name=FONT_NAME, font_size=self._fs(15),
