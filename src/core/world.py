@@ -35,6 +35,9 @@ class World:
         # 障碍 ∪ 墙壁，通行判定的唯一索引（O(1) 查询）
         self._blocked: set[tuple[int, int]] = set()
         self._kinds: dict[tuple[int, int], str] = {}
+        # KI-011：按 chunk 分桶，矩形查询只遍历覆盖到的 chunk（O(命中格数)）
+        self._blocked_by_chunk: dict[tuple[int, int], set[tuple[int, int]]] = {}
+        self._foods_by_chunk: dict[tuple[int, int], set[tuple[int, int]]] = {}
 
     # ---------- 查询 ----------
     def has_chunk(self, cell: tuple[int, int]) -> bool:
@@ -45,23 +48,45 @@ class World:
         return set(self._chunks)
 
     # ---------- M3 AI 接口（只读，禁止 AI 直接碰 _blocked/_foods/_chunks） ----------
+    def _chunk_range(self, x0: int, y0: int, x1: int, y1: int) -> tuple[int, int, int, int]:
+        lo_x, hi_x = (x0, x1) if x0 <= x1 else (x1, x0)
+        lo_y, hi_y = (y0, y1) if y0 <= y1 else (y1, y0)
+        cx0, cy0 = chunk_coord((lo_x, lo_y))
+        cx1, cy1 = chunk_coord((hi_x, hi_y))
+        return (cx0, cy0, cx1, cy1, lo_x, hi_x, lo_y, hi_y)
+
     def query_blocked_in_rect(
         self, x0: int, y0: int, x1: int, y1: int
     ) -> set[tuple[int, int]]:
-        """返回矩形内所有阻挡格（障碍 + 墙壁）。含端点，坐标自动归一化。"""
-        lo_x, hi_x = (x0, x1) if x0 <= x1 else (x1, x0)
-        lo_y, hi_y = (y0, y1) if y0 <= y1 else (y1, y0)
-        return {
-            (x, y)
-            for (x, y) in self._blocked
-            if lo_x <= x <= hi_x and lo_y <= y <= hi_y
-        }
+        """返回矩形内所有阻挡格（障碍 + 墙壁）。含端点，坐标自动归一化。
+
+        只遍历矩形覆盖的 chunk 桶（KI-011），成本 O(命中格数)。
+        """
+        cx0, cy0, cx1, cy1, lo_x, hi_x, lo_y, hi_y = self._chunk_range(x0, y0, x1, y1)
+        out: set[tuple[int, int]] = set()
+        for cx in range(cx0, cx1 + 1):
+            for cy in range(cy0, cy1 + 1):
+                bucket = self._blocked_by_chunk.get((cx, cy))
+                if not bucket:
+                    continue
+                out.update(
+                    (x, y) for (x, y) in bucket if lo_x <= x <= hi_x and lo_y <= y <= hi_y
+                )
+        return out
 
     def foods_in_rect(self, x0: int, y0: int, x1: int, y1: int) -> set[tuple[int, int]]:
-        """返回矩形内的食物格。含端点，坐标自动归一化。"""
-        lo_x, hi_x = (x0, x1) if x0 <= x1 else (x1, x0)
-        lo_y, hi_y = (y0, y1) if y0 <= y1 else (y1, y0)
-        return {(x, y) for (x, y) in self._foods if lo_x <= x <= hi_x and lo_y <= y <= hi_y}
+        """返回矩形内的食物格。含端点，坐标自动归一化；只遍历覆盖到的 chunk 桶。"""
+        cx0, cy0, cx1, cy1, lo_x, hi_x, lo_y, hi_y = self._chunk_range(x0, y0, x1, y1)
+        out: set[tuple[int, int]] = set()
+        for cx in range(cx0, cx1 + 1):
+            for cy in range(cy0, cy1 + 1):
+                bucket = self._foods_by_chunk.get((cx, cy))
+                if not bucket:
+                    continue
+                out.update(
+                    (x, y) for (x, y) in bucket if lo_x <= x <= hi_x and lo_y <= y <= hi_y
+                )
+        return out
 
     def chunk_at(self, cell: tuple[int, int]) -> Chunk | None:
         return self._chunks.get(chunk_coord(cell))
@@ -101,10 +126,17 @@ class World:
     def add_blocked(self, cell: tuple[int, int], kind: str = BLOCK_OBSTACLE) -> None:
         self._blocked.add(cell)
         self._kinds[cell] = kind
+        self._blocked_by_chunk.setdefault(chunk_coord(cell), set()).add(cell)
 
     def discard_blocked(self, cell: tuple[int, int]) -> None:
         self._blocked.discard(cell)
         self._kinds.pop(cell, None)
+        key = chunk_coord(cell)
+        bucket = self._blocked_by_chunk.get(key)
+        if bucket is not None:
+            bucket.discard(cell)
+            if not bucket:
+                self._blocked_by_chunk.pop(key, None)
 
     # ---------- 预生成 ----------
     def ensure_chunk(self, cx: int, cy: int) -> Chunk:
@@ -152,6 +184,7 @@ class World:
         chunk.foods = sorted(accepted)
         for cell in chunk.foods:
             self._foods.add(cell)
+            self._foods_by_chunk.setdefault(key, set()).add(cell)
 
         chunk.next_salt = max(salt, 1 + C.CHUNK_SIZE * C.CHUNK_SIZE)
         self._chunks[key] = chunk
@@ -170,6 +203,8 @@ class World:
             self._foods.discard(cell)
         for cell in chunk.obstacles | chunk.walls:
             self.discard_blocked(cell)
+        self._foods_by_chunk.pop((cx, cy), None)
+        self._blocked_by_chunk.pop((cx, cy), None)
 
     # ---------- 食物 ----------
     def consume_food(
@@ -182,6 +217,11 @@ class World:
             return False
         self._foods.discard(cell)
         cx, cy = chunk_coord(cell)
+        fbucket = self._foods_by_chunk.get((cx, cy))
+        if fbucket is not None:
+            fbucket.discard(cell)
+            if not fbucket:
+                self._foods_by_chunk.pop((cx, cy), None)
         chunk = self._chunks.get((cx, cy))
         if chunk is not None and cell in chunk.foods:
             chunk.foods.remove(cell)
@@ -200,4 +240,5 @@ class World:
             chunk.foods.append(cell)
             chunk.foods.sort()
             self._foods.add(cell)
+            self._foods_by_chunk.setdefault((chunk.cx, chunk.cy), set()).add(cell)
             return

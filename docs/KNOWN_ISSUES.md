@@ -18,13 +18,15 @@
 | KI-008 | M2/R2 | P2 | 障碍的连通性是**启发式保证**（边界整行整列全通 + 修孤立单格 + 密度低），**不是严格洪水填充**；真正的连通性校验在 R3 的墙壁生成里做，并把障碍一起纳入同一张图。KI-007 的修复只在单 chunk 内生效，跨 chunk 的封闭环未做全局证明 | 设计评审 | R3 起 | open |
 | KI-009 | M2/R3 | P1 | **随包字体是 Windows 自带 SimHei 的副本**（`assets/fonts/ChineseFallback.ttf`），仅可用于本地开发；NotoSansSC 下载的 OTF 被 SDL2 文本后端拒绝加载（`Couldn't load font file`）。**发布前必须替换为 OFL 授权的 NotoSansSC/DroidSansFallback TTF**，否则有版权与打包风险 | 检查 `assets/fonts/` | M5 打包前 | open |
 | KI-010 | M2/R4 | P3 | 已加载 chunk 数量随视口尺寸变化：受控视口（1 chunk + 2 圈）= 30，符合 20~30；但 1280×720（视口跨 2×1 chunk）+ 卸载 3 圈会到 **42**，超出验收区间。收紧到 20~30 需把预加载降到 1 圈或把卸载降到 2 圈（后者会失去滞回带），需拍板 | `--smoke 8` 看 `chunks_loaded` | M2 | **wontfix**（需求偏差已确认，实现不改：ARCH §7.1 已改为 30~45 个 / <1MB；D-005 锁定值不变） |
-| KI-011 | M3 前 | P2 | `World.query_blocked_in_rect` / `foods_in_rect` 目前是 O(n) 遍历 `_blocked`/`_foods`；42 chunk 约 2500 个 blocked cell，M3 的 AI 每一步都调用会把 8ms 预算吃光。M3 开工前改为按 chunk 分桶（`_blocked_by_chunk: dict[key, set]`）或空间哈希，把矩形查询降到 O(命中格数) | M3 性能测试 | M3 | open |
+| KI-011 | M3 前 | P2 | `World.query_blocked_in_rect` / `foods_in_rect` 目前是 O(n) 遍历 `_blocked`/`_foods`；42 chunk 约 2500 个 blocked cell，M3 的 AI 每一步都调用会把 8ms 预算吃光。M3 开工前改为按 chunk 分桶（`_blocked_by_chunk: dict[key, set]`）或空间哈希，把矩形查询降到 O(命中格数) | M3 性能测试 | M3 | **fixed**（已加 `_blocked_by_chunk`/`_foods_by_chunk`；42 chunk 下 p95 **0.043ms**） |
 
 ## 已关闭
 
 | ID | 阶段 | 级别 | 现象 | 修复与验证 | 关闭时间 |
 |---|---|---|---|---|---|
 | KI-002 | M1/R1 | P1 | 本机 Python 3.14 装不上 Kivy 2.3.0，GUI 未实跑 | 建 `.venv`(3.11.3) + kivy 2.3.0；`--smoke` 多轮 exit 0，4 张多分辨率截图 | 2026-10-22 |
+| KI-011 | M3 前 | P2 | 矩形查询 O(n) | 加 `_blocked_by_chunk` / `_foods_by_chunk` 分桶；42 chunk 下 p95 0.043ms；`tests/test_rect_query_perf.py` | 2026-10-22 |
+| KI-012 | M3 前置 | — | **Kivy 按钮中文渲染方案已确定（M4 用）**：A=`Button(text,font_name=SnakeCJK)` ✅；B=`ButtonBehavior+Label` ✅（可渲染但无背板，需自绘）；C=`Button+markup` 与 A 逐字节相同（markup 不影响 CJK 字形）。**根因**：早先"只出现几个点"不是字体问题，而是 Button 作为 `GameCanvas` 的子 Widget 被每帧 `canvas.clear()` 连带清掉。**M4 结论：按钮放在覆盖层 `FloatLayout`（与 GameCanvas 同级），用方案 A** | 2026-10-22 |
 
 ## 阶段记录
 
