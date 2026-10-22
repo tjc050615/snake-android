@@ -44,6 +44,7 @@ class GameCanvas(Widget):
         self.too_small = False
         self._resize_event: ClockEvent | None = None
         self.ai_path: list[tuple[int, int]] = []  # M3：AI 路径（半透明折线）
+        self.overlay_text = ""                    # 暂停倒计时 / 回放提示
         self.colors = palette("dark")
         self.show_grid = True
         self.head_highlight = True
@@ -263,6 +264,8 @@ class GameCanvas(Widget):
                 self._draw_status_text()
 
             self._draw_joystick()
+            if self.overlay_text:
+                self._draw_overlay_text()
 
     # ---------- 触控（M4/R1）：游戏区内摇杆/滑动，面板区由 Panel 自己消费 ----------
     def on_touch_down(self, touch) -> bool:
@@ -300,6 +303,15 @@ class GameCanvas(Widget):
         self.show_grid = bool(show_grid)
         self.head_highlight = bool(head_highlight)
         self.rebuild()
+
+    def _draw_overlay_text(self) -> None:
+        label = CoreLabel(text=self.overlay_text, font_size=40,
+                          font_name=font_name() or "Roboto", color=(1, 1, 0.8, 1))
+        label.refresh()
+        tex = label.texture
+        Color(1, 1, 1, 1)
+        Rectangle(texture=tex, size=tex.size,
+                  pos=(self.center_x - tex.width / 2, self.center_y - tex.height / 2))
 
     # ---------- 虚拟摇杆（M4/R1） ----------
     def joystick_center(self) -> tuple[float, float]:

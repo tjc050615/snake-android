@@ -48,6 +48,18 @@ ZH = {
     "no_history": "还没有对局记录",
     "mode_ai": "AI",
     "mode_human": "人类",
+    "achievements": "成就",
+    "onboarding_title": "新手引导",
+    "onboarding_next": "下一步",
+    "onboarding_step1": "第一步：方向键或屏幕滑动控制方向",
+    "onboarding_step2": "第二步：右侧面板可切换穿墙与设置",
+    "onboarding_step3": "第三步：吃食物变长，别撞到自己",
+    "replay": "回放",
+    "ach_score_100": "单局破 100 分",
+    "ach_ai_food_100": "AI 单局吃 100 食物",
+    "ach_wrap_food_100": "穿墙单局吃 100 食物",
+    "ach_play_1h": "累计 1 小时",
+    "ach_daily_10": "单日 10 局",
 }
 
 EN = {
@@ -94,6 +106,18 @@ EN = {
     "no_history": "No games yet",
     "mode_ai": "AI",
     "mode_human": "Human",
+    "achievements": "Achievements",
+    "onboarding_title": "Onboarding",
+    "onboarding_next": "Next",
+    "onboarding_step1": "Step 1: use arrow keys or swipe to steer",
+    "onboarding_step2": "Step 2: right panel toggles wrap mode and settings",
+    "onboarding_step3": "Step 3: eat food to grow, avoid hitting yourself",
+    "replay": "Replay",
+    "ach_score_100": "Score 100 in one run",
+    "ach_ai_food_100": "AI eats 100 food in one run",
+    "ach_wrap_food_100": "Wrap mode: 100 food in one run",
+    "ach_play_1h": "Play 1 hour total",
+    "ach_daily_10": "10 games in one day",
 }
 
 STRINGS: dict[str, dict[str, str]] = {"zh": ZH, "en": EN}

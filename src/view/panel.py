@@ -16,13 +16,14 @@ from app.fonts import FONT_NAME
 
 class Panel(BoxLayout):
     def __init__(self, game, on_wrap=None, on_restart=None, on_settings=None,
-                 on_history=None, **kwargs) -> None:
+                 on_history=None, on_achievements=None, **kwargs) -> None:
         super().__init__(orientation="vertical", padding=12, spacing=10, **kwargs)
         self.game = game
         self._on_wrap = on_wrap
         self._on_restart = on_restart
         self._on_settings = on_settings
         self._on_history = on_history
+        self._on_achievements = on_achievements
 
         self.lbl_score = Label(
             text="", font_name=FONT_NAME, font_size=20.0,
@@ -58,6 +59,10 @@ class Panel(BoxLayout):
         self.add_widget(self.btn_wrap)
         self.add_widget(self.btn_restart)
         self.add_widget(self.btn_history)
+        self.btn_ach = Button(text='', font_name=FONT_NAME, font_size=16.0,
+                              size_hint_y=None, height=56)
+        self.btn_ach.bind(on_release=lambda *_: self._achievements())
+        self.add_widget(self.btn_ach)
         self.add_widget(self.btn_settings)
         self.add_widget(Label(text="", size_hint_y=1))  # 弹性占位
 
@@ -68,6 +73,7 @@ class Panel(BoxLayout):
         self.lbl_score.text = f"{strings.t('score')} {self.game.score}"
         self.btn_wrap.text = strings.t("wrap_on" if self.game.wrap_mode else "wrap_off")
         self.btn_history.text = strings.t("history")
+        self.btn_ach.text = strings.t("achievements")
 
     # ---------- 事件 ----------
     def _wrap(self) -> None:
@@ -87,6 +93,10 @@ class Panel(BoxLayout):
     def _history(self) -> None:
         if self._on_history is not None:
             self._on_history()
+
+    def _achievements(self) -> None:
+        if self._on_achievements is not None:
+            self._on_achievements()
 
     # ---------- 触控隔离 ----------
     def on_touch_down(self, touch) -> bool:

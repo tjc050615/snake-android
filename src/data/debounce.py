@@ -40,3 +40,7 @@ class DebouncedSaver:
             self.failures += 1
             LOG.warning("config save failed, keep in-memory state: %s", exc)
             return False
+
+    def flush_all(self) -> bool:
+        """App.on_stop 调用：强制写掉尚未落盘的修改（Kivy 不会自动跑 pending Clock）。"""
+        return self.flush()

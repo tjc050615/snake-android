@@ -38,7 +38,10 @@ from core.snake import DIR_DOWN, DIR_LEFT, DIR_RIGHT, DIR_UP, Snake
 from platform_layer import desktop
 from view.game_canvas import GameCanvas
 from view.panel import Panel
+from core.pause import PauseGate
+from data.onboarding import mark_done, should_show
 from view.history_panel import HistoryPanel
+from view.info_panel import AchievementPanel, OnboardingPanel
 from view.settings_panel import SettingsOverlay
 
 DEFAULT_SEED = 20261022
@@ -76,6 +79,10 @@ class SnakeApp(App):
     clip_demo = False
     settings_shot = False
     history_shot = False
+    ach_shot = False
+    onboard_shot = False
+    pause_shot = False
+    replay_shot = False
     theme_override: str | None = None
     font_override: float | None = None
 
@@ -93,6 +100,9 @@ class SnakeApp(App):
         self.profile_store = ProfileStore(os.path.join(home, "profile.json"))
         self.profile = self.profile_store.load()
         self._recorded = False
+        self.pause_gate = PauseGate()
+        self.achievements_overlay = None
+        self.onboarding_overlay = None
         if self.theme_override:
             self.cfg["theme"] = self.theme_override
         if self.font_override:
@@ -118,6 +128,7 @@ class SnakeApp(App):
             self.game, on_wrap=self._toggle_wrap, on_restart=self._restart,
             on_settings=self._open_settings,
             on_history=self._open_history,
+            on_achievements=self._open_achievements,
         )
         self.panel.size_hint = (0.30, 1.0)
         self.panel.pos_hint = {"right": 1, "y": 0}
@@ -167,6 +178,18 @@ class SnakeApp(App):
             if self.settings_shot:
                 Clock.schedule_once(lambda _dt: self._open_settings(), 0.4)
                 Clock.schedule_once(lambda _dt: self._shot("settings"), 1.0)
+            if self.ach_shot:
+                Clock.schedule_once(lambda _dt: self._open_achievements(), 0.4)
+                Clock.schedule_once(lambda _dt: self._shot("achievements"), 1.0)
+            if self.onboard_shot:
+                Clock.schedule_once(lambda _dt: self._open_onboarding(), 0.3)
+                Clock.schedule_once(lambda _dt: self._shot("onboarding"), 0.9)
+            if self.pause_shot:
+                Clock.schedule_once(lambda _dt: self._toggle_pause(), 0.4)
+                Clock.schedule_once(lambda _dt: self._shot("pause"), 0.9)
+            if self.replay_shot:
+                self.canvas_widget.overlay_text = f"{strings.t('replay')} 12/120 1x"
+                Clock.schedule_once(lambda _dt: self._shot("replay"), 0.8)
             if self.history_shot:
                 Clock.schedule_once(self._setup_history_shot, 0.3)
                 Clock.schedule_once(lambda _dt: self._shot("history"), 1.0)
@@ -231,10 +254,55 @@ class SnakeApp(App):
 
     def on_stop(self) -> None:
         try:
-            self.saver.flush()
+            self.saver.flush_all()   # 退出前强制写盘，避免 debounce 丢最后一次修改
             self.crash.stop()
         except Exception:  # pragma: no cover
             pass
+
+    # ---------- 成就 / 引导 / 暂停 ----------
+    def _open_achievements(self) -> None:
+        if self.achievements_overlay is not None:
+            return
+        stats = {"best_score": self.profile.get("best_score", 0),
+                 "total_seconds": int(self.profile.get("total_games", 0) * 30)}
+        self.achievements_overlay = AchievementPanel(
+            self.profile, stats, on_close=self._close_achievements)
+        self.achievements_overlay.size_hint = (0.30, 1.0)
+        self.achievements_overlay.pos_hint = {"right": 1, "y": 0}
+        self.root_layout.add_widget(self.achievements_overlay)
+        self.panel.opacity = 0
+        self.panel.disabled = True
+
+    def _close_achievements(self) -> None:
+        if self.achievements_overlay is not None:
+            self.root_layout.remove_widget(self.achievements_overlay)
+            self.achievements_overlay = None
+        self.panel.opacity = 1
+        self.panel.disabled = False
+
+    def _open_onboarding(self) -> None:
+        if self.onboarding_overlay is not None:
+            return
+        self.onboarding_overlay = OnboardingPanel(on_finish=self._finish_onboarding)
+        self.onboarding_overlay.size_hint = (0.34, 0.6)
+        self.onboarding_overlay.pos_hint = {"center_x": 0.35, "center_y": 0.5}
+        self.root_layout.add_widget(self.onboarding_overlay)
+
+    def _finish_onboarding(self) -> None:
+        if self.onboarding_overlay is not None:
+            self.root_layout.remove_widget(self.onboarding_overlay)
+            self.onboarding_overlay = None
+        self.profile = mark_done(self.profile)
+        try:
+            self.profile_store.save(self.profile)
+        except Exception:
+            pass
+
+    def _toggle_pause(self) -> None:
+        if self.pause_gate.active:
+            self.pause_gate.finish()
+        else:
+            self.pause_gate.pause()
 
     # ---------- 历史 / 种子 ----------
     def _open_history(self) -> None:
@@ -264,6 +332,9 @@ class SnakeApp(App):
         self.game.reset(seed)
         self.game.clock.set_speed(self.speed)
         self._recorded = False
+        self.pause_gate = PauseGate()
+        self.achievements_overlay = None
+        self.onboarding_overlay = None
         if self.canvas_widget.camera is not None:
             self.canvas_widget.camera.reset(self.game.snake.head)
             self.canvas_widget.viewport = self.canvas_widget.camera.viewport()
@@ -322,6 +393,14 @@ class SnakeApp(App):
             self._update_chunks()
             self.canvas_widget.rebuild()
             return
+        if self.pause_gate.active:
+            self.pause_gate.update(dt)
+            if self.pause_gate.active:
+                self.canvas_widget.overlay_text = str(self.pause_gate.label_seconds())
+            else:
+                self.canvas_widget.overlay_text = ""
+            self.canvas_widget.rebuild()
+            return
         summary = self.game.update(dt)
         camera_moved = self.canvas_widget.advance(dt)
         self._update_chunks()
@@ -369,6 +448,9 @@ class SnakeApp(App):
         self.game.reset(self.game.seed)
         self.game.clock.set_speed(self.speed)
         self._recorded = False
+        self.pause_gate = PauseGate()
+        self.achievements_overlay = None
+        self.onboarding_overlay = None
         if self.canvas_widget.camera is not None:
             self.canvas_widget.camera.reset(self.game.snake.head)
             self.canvas_widget.viewport = self.canvas_widget.camera.viewport()
