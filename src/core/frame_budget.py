@@ -29,10 +29,10 @@ def chunk_slot(had_ai_tick: bool, seconds_since_chunk: float = 0.0,
     """
     if not had_ai_tick:
         return True
-    return seconds_since_chunk >= max_skip_s
+    return seconds_since_chunk >= max_skip_s - 1e-9  # 容忍浮点累加误差（6×1/60 略小于 0.1）
 
 
 def forced_chunk_frame(had_ai_tick: bool, seconds_since_chunk: float,
                        max_skip_s: float = MAX_CHUNK_SKIP_SECONDS) -> bool:
     """强制 chunk 帧：该帧跳过 AI 决策，保证 AI 与 chunk 不同帧。"""
-    return had_ai_tick and seconds_since_chunk >= max_skip_s
+    return had_ai_tick and seconds_since_chunk >= max_skip_s - 1e-9

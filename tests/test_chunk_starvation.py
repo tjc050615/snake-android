@@ -39,8 +39,8 @@ def test_chunk_starvation_at_10x():
             since = 0.0
             updates += 1
 
-    assert updates >= 70, f"chunk 更新只有 {updates} 次，存在饿死"
-    assert updates <= 95, "也不应每帧都生成"
+    assert updates >= 78, f"chunk 更新只有 {updates} 次，存在饿死"
+    assert updates <= 90, "也不应每帧都生成"
 
 
 def test_chunk_skip_uses_time_not_frames():

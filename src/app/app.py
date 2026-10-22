@@ -604,6 +604,8 @@ class SnakeApp(App):
                 self.canvas_widget.overlay_text = ""
             self.canvas_widget.rebuild()
             return
+        # 先累加本帧 dt，再判断强制 chunk 帧：避免阈值判断晚一帧
+        self._time_since_chunk += dt
         self._force_chunk_now = forced_chunk_frame(
             had_ai_tick=self.session is not None,
             seconds_since_chunk=self._time_since_chunk,
@@ -611,7 +613,6 @@ class SnakeApp(App):
         summary = self.game.update(dt)
         camera_moved = self.canvas_widget.advance(dt)
         had_ai_tick = bool(self.session is not None and summary.ticks)
-        self._time_since_chunk += dt
         if chunk_slot(had_ai_tick=had_ai_tick, seconds_since_chunk=self._time_since_chunk):
             self._time_since_chunk = 0.0
             self._update_chunks()

@@ -57,3 +57,4 @@
 3. 修复后状态改 `fixed`，**追加**验证记录，不删除原行。
 4. P0 不得带入下一阶段；不得静默关闭条目。
 5. 与 DECISIONS 冲突的问题，先改 DECISIONS 再修代码，不许反向改文档凑代码。
+| KI-025 | R5B | P3 | `forced_chunk_frame(had_ai_tick=self.session is not None)` 用的是「AI 模式开启」而非「本帧有 AI tick」：低速度（1x 10Hz）下每 6 帧才 1 帧真有 tick，强制 chunk 帧会跳过 AI 并 `note_forced_reuse()` +1，导致 reuse 虚高。建议 R5B 改用 `summary.ticks > 0`，或把 reuse 拆成 `reuse_no_decision` / `reuse_starvation` | 统计面板 reuse 校验 | R5B | open |

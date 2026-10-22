@@ -215,3 +215,13 @@ if self._force_chunk_now:
 这是漏掉饿死的直接原因（对应你列的情况 1 + 2）。现已由真实数据替换：
 `test_10x_ticks_every_frame`（真 TickClock，{1:201, 2:399}）+
 `test_chunk_starvation_at_10x`（真 `Game.update`，500 帧 70~95 次生成）。
+
+## 15. 时间阈值实现细节（R5A 收尾）
+
+- `_time_since_chunk += dt` 已移到 **`_frame` 开头、`game.update(dt)` 之前**，
+  阈值判断使用包含本帧 dt 的累计值，不会晚一帧触发。
+- 浮点累加误差（6 × 1/60 = 0.09999…）会让阈值晚 1 帧，`chunk_slot` / `forced_chunk_frame`
+  比较时加 `1e-9` 容差；`test_chunk_starvation_at_10x` 因此断言 500 帧生成 **78~90 次**（实际 ≈83）。
+- 已知问题 **KI-025**：`forced_chunk_frame` 的 `had_ai_tick` 用的是「AI 模式开启」而非
+  「本帧确有 tick」，低速下 `note_forced_reuse()` 会让 reuse 虚高；R5B 统计面板校验时修
+  （改 `summary.ticks > 0`，或拆分 reuse 计数）。
