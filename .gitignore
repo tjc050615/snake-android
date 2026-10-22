@@ -5,3 +5,9 @@ __pycache__/
 .pytest_cache/
 *.log
 *.mp3
+
+.data/
+bin/
+.buildozer/
+apk-contents.txt
+buildozer-debug.log
