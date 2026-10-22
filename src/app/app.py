@@ -134,6 +134,7 @@ class SnakeApp(App):
         self.replay_mode = False
         self.recorder = None  # game 创建后再初始化
         self.replay_driver = None
+        self._frames_since_chunk = 0
         self._recorded = False
         self.pause_gate = PauseGate()
         self.achievements_overlay = None
@@ -605,8 +606,10 @@ class SnakeApp(App):
         summary = self.game.update(dt)
         camera_moved = self.canvas_widget.advance(dt)
         had_ai_tick = bool(self.session is not None and summary.ticks)
-        if chunk_slot(had_ai_tick=had_ai_tick):
-            self._update_chunks()   # R5A 错峰：AI 决策帧不生成 chunk
+        self._frames_since_chunk += 1
+        if chunk_slot(had_ai_tick=had_ai_tick, frames_since_chunk=self._frames_since_chunk):
+            self._frames_since_chunk = 0
+            self._update_chunks()   # R5A 错峰：AI 帧跳过，最多连续跳 6 帧
         if summary.ticks or summary.died:
             self.recorder.tick(self.game.snake.direction)
             self.panel.refresh()

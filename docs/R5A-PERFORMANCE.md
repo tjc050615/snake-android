@@ -113,3 +113,57 @@
 
 新增：`tests/test_r5a_perf.py`（6 条：缓冲复用、无切片、错峰、无空白、典型/最坏帧预算）。
 保留：`test_chunk_generation_budget_p95_under_3ms`、`test_ai_tick_budget_p99_under_8ms`。
+
+
+## 9. 10x 高速 chunk 饿死（发现的真 bug 与修复）
+
+### 现象与证据
+
+10x 下 `TickClock` 每帧都有 tick。实测 600 帧、60fps：
+
+```
+ticks/frame 分布: {1: 201, 2: 399}   # 0 次从未出现
+```
+
+因此 `had_ai_tick = summary.ticks > 0` **恒为 True**（AI 模式），`chunk_slot = not had_ai_tick`
+恒为 False → chunk 永不再生成，预加载会被耗尽，视口边缘可能出现空白。
+
+**之前 `test_ai_chunk_stagger_no_gap_at_high_speed` 没有发现它**：该测试用的是
+`chunk_slot(had_ai_tick=(frame % 2 == 0))` 的**模拟**节奏（不是真 TickClock），
+且断言依赖预热阶段已加载的 chunk。属于"测试写成了 case 1（mock 节奏）"。
+
+### 修复
+
+`chunk_slot` 增加 `max_skip`：最多连续跳过 6 帧，之后强制生成一次。
+
+```python
+def chunk_slot(had_ai_tick, frames_since_chunk=0, max_skip=MAX_CHUNK_SKIP_FRAMES):
+    if not had_ai_tick:
+        return True
+    return frames_since_chunk >= max_skip
+```
+
+App 里维护 `self._frames_since_chunk`，生成后清零。
+
+### 回归测试
+
+| 测试 | 断言 |
+|---|---|
+| `test_10x_ticks_every_frame` | 10x/600 帧内不出现无 tick 帧（{1:201, 2:399}） |
+| `test_chunk_starvation_at_10x` | AI 模式 + 10x，500 帧 chunk 更新 **≥80 次**（实际约 83 次，500/6） |
+| `test_chunk_slot_human_mode_never_starves` | 人类模式每帧都生成（200/200） |
+
+### 代价与边界
+
+- 强制生成的帧仍可能与 AI 决策同帧（每 6 帧一次），最坏帧回到"AI+chunk 同帧"，因此
+  帧预算的最坏档必须按"不保证永远错峰"看待（见 §10 风险）。
+- 6 帧阈值 = 60fps 下 100ms；10x 时蛇每 100ms 前进 10 格，预加载 2 圈（64 格）足够覆盖。
+
+## 10. 最坏帧余量风险（R5B 必看）
+
+错峰后最坏帧：`logic 2.0 + AI 7.5 + input 1.0 + render 5.0 = 15.5ms`，
+距 16.67ms **只剩 1.17ms**。
+
+- 实测 AI 峰值 7.57ms，`render=5.0` 是 mock 上限；真机个别帧两者同时踩上限就会超预算。
+- **R5B 真机验收必须看 p99 帧时间，不能只看平均 FPS。**
+- 若 p99 > 16ms，按优先级降：① AI 预算 7.0→6.0ms（`AISession(budget_s=0.006)`）；② render 侧减少每帧绘制（食物/障碍批处理或 FBO）。
