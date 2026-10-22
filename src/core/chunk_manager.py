@@ -29,11 +29,17 @@ class ChunkManager:
         preload_rings: int = C.CHUNK_PRELOAD_RINGS,
         unload_rings: int = C.CHUNK_UNLOAD_RINGS,
         max_generate_per_update: int = 1,
+        initial_rect: tuple[int, int, int, int] | None = None,
     ) -> None:
         self.world = world
         self.preload_rings = max(0, int(preload_rings))
         self.unload_rings = max(self.preload_rings, int(unload_rings))
         self.max_generate_per_update = max(1, int(max_generate_per_update))
+        if initial_rect is not None:
+            for _ in range(256):
+                self.update(initial_rect)
+                if self.desired(initial_rect) <= set(self.world.loaded_chunks()):
+                    break
 
     # ---------- 目标集合 ----------
     def desired(self, rect: tuple[int, int, int, int]) -> set[tuple[int, int]]:

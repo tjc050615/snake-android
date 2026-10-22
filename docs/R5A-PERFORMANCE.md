@@ -167,3 +167,51 @@ App 里维护 `self._frames_since_chunk`，生成后清零。
 - 实测 AI 峰值 7.57ms，`render=5.0` 是 mock 上限；真机个别帧两者同时踩上限就会超预算。
 - **R5B 真机验收必须看 p99 帧时间，不能只看平均 FPS。**
 - 若 p99 > 16ms，按优先级降：① AI 预算 7.0→6.0ms（`AISession(budget_s=0.006)`）；② render 侧减少每帧绘制（食物/障碍批处理或 FBO）。
+
+
+## 11. 强制 chunk 帧跳过 AI（方案 A，已实现）
+
+`max_skip` 修复引入的新矛盾：强制 chunk 的那一帧同时跑 AI 决策 → 最坏 18.0ms 超预算。
+按方案 A 对称处理——**强制 chunk 帧跳过 AI 决策**：
+
+```python
+# core/frame_budget.py
+def forced_chunk_frame(had_ai_tick, seconds_since_chunk, max_skip_s=MAX_CHUNK_SKIP_SECONDS):
+    return had_ai_tick and seconds_since_chunk >= max_skip_s
+```
+
+```python
+# app._frame
+self._force_chunk_now = forced_chunk_frame(...)
+summary = self.game.update(dt)
+...
+# app._ai_tick
+if self._force_chunk_now:
+    self.session.note_forced_reuse()   # 记一次 no_decision_reuse
+    return
+```
+
+效果：
+- 强制 chunk 帧 = `logic 2 + input 1 + render 5 + chunk 2.5 = 10.5ms`（安全）
+- 普通 AI 帧 = `logic 2 + AI 7.5 + input 1 + render 5 = 15.5ms`
+- 10Hz 下约每 0.1~0.6s 跳过一次 AI 决策，记 1 次 `no_decision_reuse`，行为影响可忽略。
+
+## 12. 时间阈值（不依赖帧率）
+
+`MAX_CHUNK_SKIP_SECONDS = 0.1`，用 `_time_since_chunk += dt` 累加：
+- 30fps 设备：每 3 帧一次（≈100ms）
+- 120fps 设备：每 12 帧一次（≈100ms）
+- 测试 `test_chunk_skip_uses_time_not_frames` 验证两者饿死窗口都 ≈100ms。
+
+## 13. 初始化预加载
+
+`ChunkManager(..., initial_rect=...)` 构造时循环 `update()` 直到 `desired(rect) ⊆ loaded`，
+避免"前 N 帧不生成 chunk"造成开局空白。测试 `test_chunk_manager_preloads_on_init`。
+
+## 14. 旧高速测试的确认
+
+`test_ai_chunk_stagger_no_gap_at_high_speed` 原实现用
+`chunk_slot(had_ai_tick=(frame % 2 == 0))` **模拟**节奏、且预热已加载足够 chunk——
+这是漏掉饿死的直接原因（对应你列的情况 1 + 2）。现已由真实数据替换：
+`test_10x_ticks_every_frame`（真 TickClock，{1:201, 2:399}）+
+`test_chunk_starvation_at_10x`（真 `Game.update`，500 帧 70~95 次生成）。

@@ -57,6 +57,12 @@ class AISession:
         }
 
     # ---------- 每个逻辑 tick 调用 ----------
+    def note_forced_reuse(self) -> None:
+        """强制 chunk 帧跳过 AI 决策时调用：记一次"沿用上一方向"。"""
+        self.stats["no_decision_reuse"] += 1
+        self.stats["reuse"] = self.stats["no_decision_reuse"]
+        return None
+
     def tick(self, world, snake, wrap_mode: bool = False, speed: float = 1.0,
              budget_s: float | None = None) -> tuple[int, int] | None:
         self.ticks += 1

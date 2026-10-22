@@ -44,7 +44,7 @@ from data.onboarding import mark_done, should_show
 from core.debug import DebugStats
 from core.audio import Haptics, SoundManager
 from core.confirm import ConfirmState
-from core.frame_budget import chunk_slot
+from core.frame_budget import chunk_slot, forced_chunk_frame
 from core.replay import Recorder
 from core.replay_player import ReplayDriver
 from core.replay_controls import ReplayControls
@@ -134,7 +134,8 @@ class SnakeApp(App):
         self.replay_mode = False
         self.recorder = None  # game 创建后再初始化
         self.replay_driver = None
-        self._frames_since_chunk = 0
+        self._time_since_chunk = 0.0
+        self._force_chunk_now = False
         self._recorded = False
         self.pause_gate = PauseGate()
         self.achievements_overlay = None
@@ -603,13 +604,17 @@ class SnakeApp(App):
                 self.canvas_widget.overlay_text = ""
             self.canvas_widget.rebuild()
             return
+        self._force_chunk_now = forced_chunk_frame(
+            had_ai_tick=self.session is not None,
+            seconds_since_chunk=self._time_since_chunk,
+        )
         summary = self.game.update(dt)
         camera_moved = self.canvas_widget.advance(dt)
         had_ai_tick = bool(self.session is not None and summary.ticks)
-        self._frames_since_chunk += 1
-        if chunk_slot(had_ai_tick=had_ai_tick, frames_since_chunk=self._frames_since_chunk):
-            self._frames_since_chunk = 0
-            self._update_chunks()   # R5A 错峰：AI 帧跳过，最多连续跳 6 帧
+        self._time_since_chunk += dt
+        if chunk_slot(had_ai_tick=had_ai_tick, seconds_since_chunk=self._time_since_chunk):
+            self._time_since_chunk = 0.0
+            self._update_chunks()
         if summary.ticks or summary.died:
             self.recorder.tick(self.game.snake.direction)
             self.panel.refresh()
@@ -642,6 +647,9 @@ class SnakeApp(App):
     def _ai_tick(self, game) -> None:
         """每个逻辑 tick 开始前调用：AI 方向写入 game（下一 tick 生效）。"""
         if self.session is None:
+            return
+        if getattr(self, "_force_chunk_now", False):
+            self.session.note_forced_reuse()  # 强制 chunk 帧：跳过 AI，记一次沿用
             return
         d = self.session.tick(game.world, game.snake, game.wrap_mode, speed=self.speed)
         if d is not None:

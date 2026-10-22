@@ -32,8 +32,8 @@ def test_rebuild_no_new_list_per_frame():
 
 
 def test_ai_and_chunk_not_same_frame():
-    assert chunk_slot(had_ai_tick=True, frames_since_chunk=0) is False, "AI 决策帧默认跳过 chunk"
-    assert chunk_slot(had_ai_tick=False, frames_since_chunk=0) is True
+    assert chunk_slot(had_ai_tick=True, seconds_since_chunk=0.0) is False, "AI 决策帧默认跳过 chunk"
+    assert chunk_slot(had_ai_tick=False, seconds_since_chunk=0.0) is True
 
 
     app_src = open(os.path.join(ROOT, "src", "app", "app.py"), encoding="utf-8").read()
@@ -55,7 +55,7 @@ def test_ai_chunk_stagger_no_gap_at_high_speed():
 
     for frame in range(500):
         head = (head[0] + 1, head[1])   # 10x：每帧前进 1 格（模拟最坏位移）
-        if chunk_slot(had_ai_tick=(frame % 2 == 0), frames_since_chunk=frame % 7):
+        if chunk_slot(had_ai_tick=(frame % 2 == 0), seconds_since_chunk=(frame % 7) * 0.02):
             cm.update(rect(head))
         need = cm.desired(rect(head))
         have = set(world.loaded_chunks())
