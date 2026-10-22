@@ -67,8 +67,12 @@ jobs:
             cp -r "$SDK_DIR/cmdline-tools/lib" "$SDK_DIR/tools/" || true
           fi
           
+          echo "====== 主动安装 Android API 33 环境 ======"
+          # 强制接受协议并安装 API 33 和对应的 build-tools
+          yes | "$SDK_DIR/tools/bin/sdkmanager" --sdk_root="$SDK_DIR" "platforms;android-33" "build-tools;33.0.2" "platform-tools" || true
+          
           echo "====== 修复 aidl ======"
-          for v in 35.0.0 34.0.0 33.0.0 32.0.0 31.0.0 30.0.3 29.0.3; do
+          for v in 35.0.0 34.0.0 33.0.2 33.0.0 32.0.0 31.0.0 30.0.3 29.0.3; do
             mkdir -p "$SDK_DIR/build-tools/$v"
             sudo ln -sf /usr/bin/aidl "$SDK_DIR/build-tools/$v/aidl"
           done
