@@ -14,8 +14,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "restart_hint": "按 R 重新开始",
         "paused": "已暂停",
         "restart_confirm": "确定要重新开始吗？",
-        "wrap_on": "穿墙: 开",
-        "wrap_off": "穿墙: 关",
+        "wrap_on": "穿墙 开",
+        "wrap_off": "穿墙 关",
         "safety_l2_note": "连通面积校验为启发式加强，非严格保证",
     },
     "en": {

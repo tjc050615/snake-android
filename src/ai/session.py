@@ -60,7 +60,8 @@ class AISession:
         self.ticks += 1
         high = speed >= HIGH_SPEED
         self.period = 2 if high else 1
-        self.timeout_s = 0.004 if high else 0.008
+        # 留 1ms 余量给 Python 调度抖动，保证总耗时 p99 < 8ms
+        self.timeout_s = 0.0035 if high else 0.0070
         self.controller.radius_cap = 40 if high else 80
 
         # 高速档：每 2 tick 决策一次；其余每 tick

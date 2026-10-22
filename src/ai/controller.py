@@ -109,10 +109,10 @@ class AIController:
         for food in foods[:MAX_FOOD_CANDIDATES]:
             if deadline is not None and time.perf_counter() > deadline:
                 break  # 预算耗尽：不再尝试更多候选，直接走兜底
-            if not safety.level1_reachable(world, snake, food, wrap_mode):
+            if not safety.level1_reachable(world, snake, food, wrap_mode, deadline=deadline):
                 self.stats["blocked_l1"] += 1
                 continue
-            if not safety.level2_ok(world, snake, food, wrap_mode):
+            if not safety.level2_ok(world, snake, food, wrap_mode, deadline=deadline):
                 self.stats["blocked_l2"] += 1
                 continue
 

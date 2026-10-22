@@ -16,7 +16,7 @@
 | KI-006 | M5 | P2 | 插值要求每帧重绘，`rebuild()` 每帧 `canvas.clear()` + 重建全部 Canvas 指令（网格线 40+ 条）。M5 应改局部更新 / 指令池复用 | 观察 `rebuild` 每帧调用 | M5 | open |
 | KI-007 | M2/R2 | P3 | 障碍生成后的"孤立格修复"会移除 0~2 个障碍，导致个别 chunk 密度略低于 5%（实测仍 ≥4%）；修复逻辑本身无跳变，属可接受偏差 | `gen.chunk_obstacle_cells` 返回数 < `round(0.05*1024)` | M2 | open |
 | KI-008 | M2/R2 | P2 | 障碍的连通性是**启发式保证**（边界整行整列全通 + 修孤立单格 + 密度低），**不是严格洪水填充**；真正的连通性校验在 R3 的墙壁生成里做，并把障碍一起纳入同一张图。KI-007 的修复只在单 chunk 内生效，跨 chunk 的封闭环未做全局证明 | 设计评审 | R3 起 | open |
-| KI-009 | M2/R3 | P1 | **随包字体是 Windows 自带 SimHei 的副本**（`assets/fonts/ChineseFallback.ttf`），仅可用于本地开发；NotoSansSC 下载的 OTF 被 SDL2 文本后端拒绝加载（`Couldn't load font file`）。**发布前必须替换为 OFL 授权的 NotoSansSC/DroidSansFallback TTF**，否则有版权与打包风险 | 检查 `assets/fonts/` | M5 打包前 | open |
+| KI-009 | M2/R3 | P1 | **随包字体已换成 `assets/fonts/DroidSansFallback.ttf`**（AOSP，3.45MB TTF，SDL2 可加载）。注意：该字体**缺半角标点**（`:` 渲染成豆腐块），UI 文案避免用冒号等标点，或 M4 换 Noto Sans SC TTF | `spawn0001.png` | M2 | **fixed**（SimHei 副本已删除） |
 | KI-010 | M2/R4 | P3 | 已加载 chunk 数量随视口尺寸变化：受控视口（1 chunk + 2 圈）= 30，符合 20~30；但 1280×720（视口跨 2×1 chunk）+ 卸载 3 圈会到 **42**，超出验收区间。收紧到 20~30 需把预加载降到 1 圈或把卸载降到 2 圈（后者会失去滞回带），需拍板 | `--smoke 8` 看 `chunks_loaded` | M2 | **wontfix**（需求偏差已确认，实现不改：ARCH §7.1 已改为 30~45 个 / <1MB；D-005 锁定值不变） |
 | KI-011 | M3 前 | P2 | `World.query_blocked_in_rect` / `foods_in_rect` 目前是 O(n) 遍历 `_blocked`/`_foods`；42 chunk 约 2500 个 blocked cell，M3 的 AI 每一步都调用会把 8ms 预算吃光。M3 开工前改为按 chunk 分桶（`_blocked_by_chunk: dict[key, set]`）或空间哈希，把矩形查询降到 O(命中格数) | M3 性能测试 | M3 | **fixed**（已加 `_blocked_by_chunk`/`_foods_by_chunk`；42 chunk 下 p95 **0.043ms**） |
 
@@ -31,7 +31,7 @@
 | KI-014 | M3/R3 | P3 | `foods[:8]` 截断没有放宽机制：连续多 tick 最近 8 个食物全被安全校验拒绝时，AI 会持续跟尾。M4 观察长局后再决定是否加"连续 N 次全不安全 → 扩到 16" | 长局统计 `blocked_l1+blocked_l2` | M4 | open |
 | KI-015 | M3/R3 | P2 | A* 基线 p95 1.08ms 是**开放空间**数据；有密集障碍/墙壁时扩展节点更多。R3 必须补障碍场景基线，8ms 超时阈值以障碍场景为准 | `tests/test_ai_timeout.py` | R3 | **fixed**（棋盘格 64×64 基线 p95 **1.66ms**） |
 | KI-016 | M3/R4 | P2 | **决策生效语义**：R3 的 `session.tick` 是"同 tick 消费"（B），与注释/ARCH 的"下一 tick 生效"矛盾。实测真延迟一 tick 会让路径随蛇头位移失效（79 tick 就死）→ **采用方案 B 并改文档**：方向作用于本次 step，`Snake.pending` 天然延迟一步；ARCH §15 已同步 | `--ai` 长局 | R3 | **fixed**（文档对齐，不做人为延迟） |
-| KI-017 | M3/R4 | P2 | 决策耗时：`timeouts` 占比应 <5%（实测 0%）；但**峰值偶发 10~12ms**（安全校验 BFS 未纳入 deadline），超过 8ms 硬上限。M4 前把 level1/level2 也纳入统一预算或降为抽样校验 | `test_m3_scenarios` 的 cost_peak | M4 | open |
+| KI-017 | M3/R4 | P2 | 决策耗时：`timeouts` 占比应 <5%；**峰值曾 10.6ms 超 8ms**（两级 BFS 无 deadline）。已修：level1/level2 加 deadline（超时保守拒绝）、A* 与 BFS 共用预算、session 预算 7ms（留 1ms 抖动余量）。实测 1000 tick：p50 1.48ms、p99 **7.35ms**、max 7.57ms | `tests/test_ai_budget.py` | R3 | **fixed** |
 | KI-018 | M3/R4 | P3 | 有障碍基线是 64×64 棋盘格；**90% 障碍迷宫**下 A* 扩展会爆炸，超 8ms 走 best-effort 属预期，但日志必须标记 `timeouts`。R4 未构造 90% 场景 | 高密度迷宫 | M4/M5 | open |
 
 ## 阶段记录
