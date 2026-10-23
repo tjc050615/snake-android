@@ -18,7 +18,8 @@ from view.themed import ThemedMixin
 
 class Panel(ThemedMixin, BoxLayout):
     def __init__(self, game, on_wrap=None, on_restart=None, on_settings=None,
-                 on_history=None, on_achievements=None, on_stats=None, **kwargs) -> None:
+                 on_history=None, on_achievements=None, on_stats=None,
+                 on_ai=None, on_speed=None, **kwargs) -> None:
         super().__init__(orientation="vertical", padding=12, spacing=10, **kwargs)
         self.game = game
         self._on_wrap = on_wrap
@@ -27,6 +28,8 @@ class Panel(ThemedMixin, BoxLayout):
         self._on_history = on_history
         self._on_achievements = on_achievements
         self._on_stats = on_stats
+        self._on_ai = on_ai
+        self._on_speed = on_speed
 
         self.lbl_score = Label(
             text="", font_name=FONT_NAME, font_size=20.0,
@@ -70,6 +73,14 @@ class Panel(ThemedMixin, BoxLayout):
         self.btn_stats.bind(on_release=lambda *_: self._stats())
         self.add_widget(self.btn_ach)
         self.add_widget(self.btn_stats)
+        self.btn_ai = Button(text='', font_name=FONT_NAME, font_size=16.0,
+                             size_hint_y=None, height=56)
+        self.btn_ai.bind(on_release=lambda *_: self._ai())
+        self.btn_speed = Button(text='', font_name=FONT_NAME, font_size=16.0,
+                                size_hint_y=None, height=56)
+        self.btn_speed.bind(on_release=lambda *_: self._speed())
+        self.add_widget(self.btn_ai)
+        self.add_widget(self.btn_speed)
         self.add_widget(self.btn_settings)
         self.add_widget(Label(text="", size_hint_y=1))  # 弹性占位
 
@@ -83,6 +94,8 @@ class Panel(ThemedMixin, BoxLayout):
         self.btn_history.text = strings.t("history")
         self.btn_ach.text = strings.t("achievements")
         self.btn_stats.text = strings.t("ai_stats")
+        self.btn_ai.text = strings.t("ai_off") if getattr(self, "ai_active", False) else strings.t("ai_on")
+        self.btn_speed.text = f"{getattr(self, 'speed', 1.0):g}x"
 
     # ---------- 事件 ----------
     def _wrap(self) -> None:
@@ -106,6 +119,16 @@ class Panel(ThemedMixin, BoxLayout):
     def _achievements(self) -> None:
         if self._on_achievements is not None:
             self._on_achievements()
+
+    def _ai(self) -> None:
+        if self._on_ai is not None:
+            self._on_ai()
+        self.refresh()
+
+    def _speed(self) -> None:
+        if self._on_speed is not None:
+            self._on_speed()
+        self.refresh()
 
     def _stats(self) -> None:
         if self._on_stats is not None:

@@ -51,6 +51,7 @@ from core.replay_controls import ReplayControls
 from data.achievements import evaluate
 from view.confirm_dialog import ConfirmDialog
 from view.debug_overlay import DebugOverlay
+from view.fps_label import FpsLabel
 from view.replay_panel import ReplayPanel
 from view.stats_panel import StatsPanel
 from view.history_panel import HistoryPanel
@@ -168,11 +169,14 @@ class SnakeApp(App):
             on_history=self._open_history,
             on_achievements=self._open_achievements,
             on_stats=self._open_stats,
+            on_ai=self._toggle_ai,
+            on_speed=self._cycle_speed,
         )
         self.panel.size_hint = (0.30, 1.0)
         self.panel.pos_hint = {"right": 1, "y": 0}
 
         self.canvas_widget.set_theme(self.cfg.get("theme", "dark"))
+        self.canvas_widget.set_background(self.cfg.get("bg_mode", "solid"), self.cfg.get("bg_index", 0))
         self.canvas_widget.apply_view_options(
             self.cfg.get("show_grid", True), self.cfg.get("head_highlight", True)
         )
@@ -187,6 +191,9 @@ class SnakeApp(App):
         root.add_widget(self.panel)
         self.root_layout = root
         self.debug_overlay = DebugOverlay(pos_hint={'x': 0.30, 'top': 0.98})
+        self.fps_label = FpsLabel(pos=(10, 10))
+        root.add_widget(self.fps_label)
+        self.canvas_widget.set_background(self.cfg.get('bg_mode', 'solid'), self.cfg.get('bg_index', 0))
         root.add_widget(self.debug_overlay)
         self._apply_theme()
         # 布局完成后再刷一次文案：面板首次创建时宽度为 0，纹理会按 0 宽缓存
@@ -308,6 +315,7 @@ class SnakeApp(App):
             self._save_event.cancel()
         self._save_event = Clock.schedule_once(self._flush_save, 0.5)
         self.canvas_widget.set_theme(self.cfg.get("theme", "dark"))
+        self.canvas_widget.set_background(self.cfg.get("bg_mode", "solid"), self.cfg.get("bg_index", 0))
         self.canvas_widget.apply_view_options(
             self.cfg.get("show_grid", True), self.cfg.get("head_highlight", True)
         )
@@ -377,6 +385,24 @@ class SnakeApp(App):
         except Exception:
             pass
 
+    def _toggle_ai(self) -> None:
+        if self.session is None:
+            self.session = AISession()
+        else:
+            self.session = None
+        self.panel.ai_active = self.session is not None
+        self.canvas_widget.ai_path = []
+
+    def _cycle_speed(self) -> None:
+        speeds = (1.0, 2.0, 4.0)
+        try:
+            idx = speeds.index(round(self.speed, 1))
+        except ValueError:
+            idx = 0
+        self.speed = speeds[(idx + 1) % len(speeds)]
+        self.game.clock.set_speed(self.speed)
+        self.panel.speed = self.speed
+
     def _toggle_pause(self) -> None:
         if self.confirm_state.active:
             self.canvas_widget.rebuild()
@@ -390,6 +416,7 @@ class SnakeApp(App):
     def _apply_theme(self) -> None:
         colors = palette(self.cfg.get("theme", "dark"))
         self.canvas_widget.set_theme(self.cfg.get("theme", "dark"))
+        self.canvas_widget.set_background(self.cfg.get("bg_mode", "solid"), self.cfg.get("bg_index", 0))
         self.panel.apply_theme(colors)
         for name in ("settings_overlay", "history_overlay", "achievements_overlay",
                      "stats_overlay", "replay_overlay", "confirm_overlay"):
@@ -610,6 +637,7 @@ class SnakeApp(App):
             had_ai_tick=self.session is not None,
             seconds_since_chunk=self._time_since_chunk,
         )
+        self.fps_label.count_frame()
         summary = self.game.update(dt)
         camera_moved = self.canvas_widget.advance(dt)
         had_ai_tick = bool(self.session is not None and summary.ticks)

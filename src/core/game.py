@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from app import constants as C
 from core.snake import Snake
 from core.tick import TickClock
+from core import food as food_mod
 from core.world import World
 
 STATE_RUNNING = "running"
@@ -50,6 +51,9 @@ class Game:
         self.state = STATE_RUNNING
         self.score = 0
         self.ticks = 0
+        # 食物随机化：由 seed 派生（同 seed 可复现，不同 seed 不同布局）
+        self.food_rng = food_mod.food_rng(self.seed)
+        food_mod.reroll_foods(self.world, self.snake, self.food_rng)
 
     # ---------- 输入 ----------
     def set_direction(self, direction: tuple[int, int]) -> bool:
@@ -80,6 +84,7 @@ class Game:
 
     def _tick(self):
         self.ticks += 1
+        food_mod.ensure_food(self.world, self.snake, self.food_rng)  # 保底：无食物立刻补
         for listener in self.tick_listeners:
             listener(self)
         result = self.snake.step(self.world, ignore_blocked=self.wrap_mode)

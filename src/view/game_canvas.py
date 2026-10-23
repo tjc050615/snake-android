@@ -45,6 +45,9 @@ class GameCanvas(Widget):
         self._resize_event: ClockEvent | None = None
         self.ai_path: list[tuple[int, int]] = []  # M3：AI 路径（半透明折线）
         self.overlay_text = ""                    # 暂停倒计时 / 回放提示
+        self.bg_mode = "solid"
+        self.bg_index = 0
+        self.snake_hue = 0.33
         self._cells_buf: list = []                 # R5A：蛇身插值缓冲复用
         self.colors = palette("dark")
         self.show_grid = True
@@ -298,8 +301,13 @@ class GameCanvas(Widget):
         return True
 
     def on_size(self, *args) -> None:
-        """窗口 resize：按格子尺寸比例换算相机，避免画面漂移（KI-005）。"""
-        super().on_size(*args)
+        """窗口 resize：按格子尺寸比例换算相机，避免画面漂移（KI-005）。
+
+        修复闪退：Widget 没有 on_size，调用 super().on_size() 会 AttributeError；
+        极小尺寸直接返回，避免 0 尺寸下建 viewport。
+        """
+        if self.width < 300 or self.height < 300:
+            return
         cam = getattr(self, "camera", None)
         vp = getattr(self, "viewport", None)
         if cam is None or vp is None or self.width <= 0 or self.height <= 0:
@@ -307,10 +315,17 @@ class GameCanvas(Widget):
         from core.camera import rescale_for_grid
 
         old = vp.grid_size
-        new = fit_grid_size(self.width, self.height)
+        from platform_layer import desktop
+
+        new = fit_grid_size(desktop.get_density(), self.width, self.height)
         if new != old:
             rescale_for_grid(cam, old, new)
             self.rebuild()
+
+    def set_background(self, mode: str, index: int) -> None:
+        """背景选择（视觉应用待恢复：当前仅保存状态，避免渲染回归）。"""
+        self.bg_mode = str(mode)
+        self.bg_index = int(index) % 16
 
     def set_theme(self, name: str) -> None:
         self.colors = palette(name)

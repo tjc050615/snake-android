@@ -223,6 +223,34 @@ class World:
         self._blocked_by_chunk.pop((cx, cy), None)
 
     # ---------- 食物 ----------
+    def add_food(self, cell: tuple[int, int]) -> bool:
+        """运行时放一个食物（模块一.4 随机刷新用）。"""
+        if cell in self._foods or not self.is_passable(cell):
+            return False
+        self._foods.add(cell)
+        cx, cy = chunk_coord(cell)
+        self._foods_by_chunk.setdefault((cx, cy), set()).add(cell)
+        chunk = self._chunks.get((cx, cy))
+        if chunk is not None:
+            chunk.foods.append(cell)
+            chunk.foods.sort()
+        return True
+
+    def discard_food(self, cell: tuple[int, int]) -> bool:
+        if cell not in self._foods:
+            return False
+        self._foods.discard(cell)
+        cx, cy = chunk_coord(cell)
+        bucket = self._foods_by_chunk.get((cx, cy))
+        if bucket is not None:
+            bucket.discard(cell)
+            if not bucket:
+                self._foods_by_chunk.pop((cx, cy), None)
+        chunk = self._chunks.get((cx, cy))
+        if chunk is not None and cell in chunk.foods:
+            chunk.foods.remove(cell)
+        return True
+
     def consume_food(
         self,
         cell: tuple[int, int],
