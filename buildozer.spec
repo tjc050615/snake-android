@@ -22,7 +22,7 @@ android.api = 33
 android.ndk = 25b
 android.ndk_api = 23
 android.permissions = VIBRATE
-android.archs = arm64-v8a, armeabi-v7a
+android.archs = arm64-v8a
 android.allow_backup = False
 
 [buildozer]
