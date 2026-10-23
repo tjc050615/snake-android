@@ -28,6 +28,7 @@ DEFAULTS: dict = {
     "font_size": 16.0,
     "bg_mode": "solid",   # solid | gradient
     "bg_index": 0,
+    "view_scale": 1.0,
 }
 
 THEMES = ("dark", "light", "high_contrast")
@@ -75,6 +76,7 @@ def validate(raw: dict) -> dict:
     cfg["theme"] = theme if theme in THEMES else "dark"
     cfg["bg_mode"] = raw.get("bg_mode") if raw.get("bg_mode") in ("solid", "gradient") else "solid"
     cfg["bg_index"] = int(raw.get("bg_index", 0)) % 16
+    cfg["view_scale"] = _clamp(raw.get("view_scale", cfg["view_scale"]), 0.6, 2.0, cfg["view_scale"])
     mode = raw.get("perf_mode", cfg["perf_mode"])
     cfg["perf_mode"] = mode if mode in PERF_MODES else "balanced"
     return cfg

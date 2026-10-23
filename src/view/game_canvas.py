@@ -15,7 +15,8 @@ from kivy.uix.widget import Widget
 from app import constants as C
 from app import strings
 from app.theme import palette
-from core.colors import background_color, gradient_pair, snake_gradient
+from core.colors import background_color, snake_gradient
+from view.gradient_bg import gradient_texture
 from app.fonts import font_name
 from core.camera import Camera
 from core.game import Game
@@ -49,6 +50,7 @@ class GameCanvas(Widget):
         self.bg_mode = "solid"
         self.bg_index = 0
         self.snake_hue = 0.33
+        self.view_scale = 1.0
         self._cells_buf: list = []                 # R5A：蛇身插值缓冲复用
         self.colors = palette("dark")
         self.show_grid = True
@@ -83,7 +85,7 @@ class GameCanvas(Widget):
     def _apply_metrics(self) -> None:
         density = desktop.get_density()
         try:
-            self.grid_size = fit_grid_size(density, self.width, self.height)
+            self.grid_size = fit_grid_size(density * self.view_scale, self.width, self.height)
             self.too_small = False
         except ValueError as exc:
             self.grid_size = C.GRID_SIZE_MIN
@@ -186,12 +188,10 @@ class GameCanvas(Widget):
         g = vp.grid_size
         with self.canvas:
             if self.bg_mode == "gradient":
-                a, b = gradient_pair(self.bg_index)
-                Color(a[0], a[1], a[2], 1)
-                Rectangle(pos=(self.x, self.y + self.height / 2),
-                          size=(self.width, self.height / 2 + 1))
-                Color(b[0], b[1], b[2], 1)
-                Rectangle(pos=self.pos, size=(self.width, self.height / 2 + 1))
+                # 单张 256 行渐变纹理铺满：平滑无断层
+                Color(1, 1, 1, 1)
+                Rectangle(texture=gradient_texture(self.bg_index),
+                          pos=self.pos, size=self.size)
             else:
                 r, g, bl = background_color(self.bg_index)
                 Color(r, g, bl, 1)
@@ -328,10 +328,15 @@ class GameCanvas(Widget):
         old = vp.grid_size
         from platform_layer import desktop
 
-        new = fit_grid_size(desktop.get_density(), self.width, self.height)
+        new = fit_grid_size(desktop.get_density() * self.view_scale, self.width, self.height)
         if new != old:
             rescale_for_grid(cam, old, new)
             self.rebuild()
+
+    def set_view_scale(self, scale: float) -> None:
+        """视野大小：scale 越大格子越小、可见范围越大（0.6~2.0）。"""
+        self.view_scale = max(0.6, min(2.0, float(scale)))
+        self.rebuild()
 
     def set_background(self, mode: str, index: int) -> None:
         """背景选择：solid / gradient，index 0~15（实时重建）。"""

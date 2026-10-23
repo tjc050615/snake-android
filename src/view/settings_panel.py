@@ -42,6 +42,7 @@ LABEL_KEY = {
     "font_size": "font_size",
     "bg_mode": "bg",
     "bg_index": "bg_index",
+    "view_scale": "view_scale",
 }
 
 
@@ -149,6 +150,7 @@ class SettingsOverlay(ThemedMixin, BoxLayout):
         )
         self._choice_row("bg_mode", ("solid", "gradient"),
                          {"solid": strings.t("bg_solid"), "gradient": strings.t("bg_gradient")})
+        self._slider_row("view_scale", 0.6, 2.0)
         self._choice_row("bg_index", tuple(range(16)), {i: str(i) for i in range(16)})
         self._switch_row("show_fps")
         self._choice_row(

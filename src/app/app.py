@@ -52,6 +52,7 @@ from data.achievements import evaluate
 from view.confirm_dialog import ConfirmDialog
 from view.debug_overlay import DebugOverlay
 from view.fps_label import FpsLabel
+from view.menu import MenuButton, Scrim
 from view.replay_panel import ReplayPanel
 from view.stats_panel import StatsPanel
 from view.history_panel import HistoryPanel
@@ -103,6 +104,7 @@ class SnakeApp(App):
     confirm_shot = False
     replaypause_shot = False
     bg_demo = False
+    menu_shot = False
     theme_override: str | None = None
     font_override: float | None = None
 
@@ -163,7 +165,7 @@ class SnakeApp(App):
             self.session = AISession()
             self.game.tick_listeners.append(self._ai_tick)
         self.canvas_widget = GameCanvas(self.game)
-        self.canvas_widget.size_hint = (0.70, 1.0)
+        self.canvas_widget.size_hint = (1.0, 1.0)
         self.canvas_widget.pos_hint = {"x": 0, "y": 0}
         self.canvas_widget.on_direction = self._on_direction
 
@@ -176,11 +178,14 @@ class SnakeApp(App):
             on_ai=self._toggle_ai,
             on_speed=self._cycle_speed,
         )
-        self.panel.size_hint = (0.30, 1.0)
+        self.panel.size_hint = (0.34, 1.0)
         self.panel.pos_hint = {"right": 1, "y": 0}
+        self.panel.opacity = 0
+        self.panel.disabled = True
 
         self.canvas_widget.set_theme(self.cfg.get("theme", "dark"))
         self.canvas_widget.set_background(self.cfg.get("bg_mode", "solid"), self.cfg.get("bg_index", 0))
+        self.canvas_widget.set_view_scale(float(self.cfg.get("view_scale", 1.0)))
         self.canvas_widget.apply_view_options(
             self.cfg.get("show_grid", True), self.cfg.get("head_highlight", True)
         )
@@ -192,12 +197,19 @@ class SnakeApp(App):
 
         root = FloatLayout()
         root.add_widget(self.canvas_widget)
+        self.scrim = Scrim(on_tap=self._close_menu, size_hint=(1, 1))
+        root.add_widget(self.scrim)
+        self.scrim.show(False)
         root.add_widget(self.panel)
+        self.menu_btn = MenuButton(on_toggle=self._toggle_menu,
+                                   pos_hint={'right': 0.99, 'top': 0.985})
+        root.add_widget(self.menu_btn)
         self.root_layout = root
         self.debug_overlay = DebugOverlay(pos_hint={'x': 0.30, 'top': 0.98})
         self.fps_label = FpsLabel(pos=(10, 10))
         root.add_widget(self.fps_label)
         self.canvas_widget.set_background(self.cfg.get('bg_mode', 'solid'), self.cfg.get('bg_index', 0))
+        self.canvas_widget.set_view_scale(float(self.cfg.get('view_scale', 1.0)))
         root.add_widget(self.debug_overlay)
         self._apply_theme()
         # 布局完成后再刷一次文案：面板首次创建时宽度为 0，纹理会按 0 宽缓存
@@ -245,6 +257,9 @@ class SnakeApp(App):
             if self.pause_shot:
                 Clock.schedule_once(lambda _dt: self._toggle_pause(), 0.4)
                 Clock.schedule_once(lambda _dt: self._shot("pause"), 0.9)
+            if self.menu_shot:
+                Clock.schedule_once(lambda _dt: self._toggle_menu(), 0.4)
+                Clock.schedule_once(lambda _dt: self._shot("menu"), 0.9)
             if self.replay_shot:
                 self.canvas_widget.overlay_text = f"{strings.t('replay')} 12/120 1x"
                 Clock.schedule_once(lambda _dt: self._shot("replay"), 0.8)
@@ -320,6 +335,7 @@ class SnakeApp(App):
         self._save_event = Clock.schedule_once(self._flush_save, 0.5)
         self.canvas_widget.set_theme(self.cfg.get("theme", "dark"))
         self.canvas_widget.set_background(self.cfg.get("bg_mode", "solid"), self.cfg.get("bg_index", 0))
+        self.canvas_widget.set_view_scale(float(self.cfg.get("view_scale", 1.0)))
         self.canvas_widget.apply_view_options(
             self.cfg.get("show_grid", True), self.cfg.get("head_highlight", True)
         )
@@ -389,6 +405,20 @@ class SnakeApp(App):
         except Exception:
             pass
 
+    def _toggle_menu(self) -> None:
+        opened = self.panel.opacity > 0.5
+        if opened:
+            self._close_menu()
+        else:
+            self.panel.opacity = 1
+            self.panel.disabled = False
+            self.scrim.show(True)
+
+    def _close_menu(self) -> None:
+        self.panel.opacity = 0
+        self.panel.disabled = True
+        self.scrim.show(False)
+
     def _toggle_ai(self) -> None:
         if self.session is None:
             self.session = AISession()
@@ -421,6 +451,7 @@ class SnakeApp(App):
         colors = palette(self.cfg.get("theme", "dark"))
         self.canvas_widget.set_theme(self.cfg.get("theme", "dark"))
         self.canvas_widget.set_background(self.cfg.get("bg_mode", "solid"), self.cfg.get("bg_index", 0))
+        self.canvas_widget.set_view_scale(float(self.cfg.get("view_scale", 1.0)))
         self.panel.apply_theme(colors)
         for name in ("settings_overlay", "history_overlay", "achievements_overlay",
                      "stats_overlay", "replay_overlay", "confirm_overlay"):
