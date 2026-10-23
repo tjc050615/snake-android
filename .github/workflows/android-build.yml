@@ -37,7 +37,8 @@ jobs:
       - name: Install buildozer
         run: |
           python -m pip install --upgrade pip
-          pip install buildozer==1.5.0 cython==0.29.36
+          # 锁定 Cython < 3.0.0 和 setuptools < 71.0.0，以兼容 buildozer 1.5.0
+          pip install "Cython<3.0.0" "setuptools<71.0.0" buildozer==1.5.0
 
       - name: Build debug APK
         env:
@@ -50,22 +51,23 @@ jobs:
           echo "====== 确认 Java 版本 ======"
           java -version
           
+          echo "====== 确认 Cython 版本 ======"
+          cython --version
+          
           echo "====== 设置 Buildozer 环境变量 ======"
           # 显式指定 SDK 和 NDK 路径，避免 buildozer 自动下载时出错
           export ANDROIDSDK="$HOME/.buildozer/android/platform/android-sdk"
-          export ANDROIDNDK="$HOME/.buildozer/android/platform/android-ndk-r28c"
+          export ANDROIDNDK="$HOME/.buildozer/android/platform/android-ndk-r25b"  # 指定一个兼容的 NDK 版本
           
           echo "====== 修复 SDK 路径 (伪造 sdkmanager) ======"
           SDK_DIR="$HOME/.buildozer/android/platform/android-sdk"
           mkdir -p "$SDK_DIR"
           
-          # 下载最新的 cmdline-tools
           if [ ! -d "$SDK_DIR/cmdline-tools" ]; then
             wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
             unzip -q cmdline-tools.zip -d "$SDK_DIR"
           fi
           
-          # 将新版 sdkmanager 复制到它死板寻找的旧目录
           mkdir -p "$SDK_DIR/tools/bin"
           if [ -d "$SDK_DIR/cmdline-tools/bin" ]; then
             cp -r "$SDK_DIR/cmdline-tools/bin/"* "$SDK_DIR/tools/bin/" || true
@@ -73,7 +75,6 @@ jobs:
           fi
           
           echo "====== 主动安装 Android API 33 环境 ======"
-          # 强制接受协议并安装 API 33 和对应的 build-tools
           yes | "$SDK_DIR/tools/bin/sdkmanager" --sdk_root="$SDK_DIR" "platforms;android-33" "build-tools;33.0.2" "platform-tools" || true
           
           echo "====== 修复 aidl ======"
@@ -83,8 +84,8 @@ jobs:
           done
           
           echo "====== 清理旧构建并开始打包 ======"
-          # 清理可能残留的旧构建文件，避免缓存干扰
           buildozer android clean || true
+          # 将 buildozer 的输出同时写入日志文件，方便排查
           buildozer -v android debug 2>&1 | tee buildozer-debug.log
 
       - name: Verify APK packaging rules
