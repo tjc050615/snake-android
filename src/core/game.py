@@ -90,7 +90,8 @@ class Game:
 
     def _tick(self):
         self.ticks += 1
-        food_mod.ensure_local_food(self.world, self.snake, self.food_rng)  # 保底：附近无食物立刻补
+        food_mod.ensure_local_food(self.world, self.snake, self.food_rng)  # 保底
+        food_mod.top_up_near(self.world, self.snake, self.food_rng)        # 30 格内补到 20 个
         for listener in self.tick_listeners:
             listener(self)
         result = self.snake.step(self.world, ignore_blocked=self.wrap_mode)

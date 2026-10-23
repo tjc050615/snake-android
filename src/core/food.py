@@ -53,8 +53,29 @@ def reroll_foods(world, snake, rng: random.Random) -> None:
 
 
 def food_cap(snake_len: int) -> int:
-    """食物上限随蛇长激进提升：基础 5，每 20 节 +1，最多 30。"""
-    return min(30, 5 + max(0, int(snake_len) // 20))
+    """全场食物上限：固定 20（体验优先）。"""
+    return 20
+
+
+def top_up_near(world, snake, rng: random.Random, radius: int = 30, per_tick: int = 3) -> int:
+    """每 tick 在蛇头 30 格内补食物，直到全场 20 个。返回新加数量。"""
+    added = 0
+    hx, hy = snake.head
+    body = set(snake.body)
+    while world.food_count() < food_cap(len(snake)) and added < per_tick:
+        cells = []
+        for _ in range(64):
+            x = hx + rng.randint(-radius, radius)
+            y = hy + rng.randint(-radius, radius)
+            cell = (x, y)
+            if cell in body or cell in world.foods() or world.is_blocked(cell):
+                continue
+            cells.append(cell)
+        if not cells:
+            break
+        world.add_food(rng.choice(cells))
+        added += 1
+    return added
 
 
 def ensure_local_food(world, snake, rng: random.Random, radius: int = 10):

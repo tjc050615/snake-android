@@ -189,7 +189,7 @@ class World:
         wanted = gen.chunk_food_count(self.seed, cx, cy)
         accepted: list[tuple[int, int]] = []
         salt = 1
-        room = max(0, 5 - self.food_count())
+        room = max(0, 20 - self.food_count())
         while len(accepted) < min(wanted, room) and salt < 1 + 4096:
             cell = gen.candidate_cell(self.seed, cx, cy, salt)
             salt += 1
