@@ -93,13 +93,24 @@ class AIController:
 
         self.stats["plans"] += 1
 
+        # R5C 紧急保底：剩余空间 < 蛇长时，立刻改走「最大连通空间」方向
+        if self.stats["plans"] % 1 == 0:
+            area = self._flood_area(world, snake, head, wrap_mode)
+            if len(snake) >= 10 and area < len(snake) + 2:
+                path = self._space_best_step(world, snake, wrap_mode, rect, deadline=deadline)
+                if path:
+                    self.state = "EMERGENCY"
+                    self.stats["emergency"] = self.stats.get("emergency", 0) + 1
+                    self.stats.update(state=self.state, path_len=1)
+                    return path
+
         # 防循环：最近 20 步里蛇头重复 ≥3 次 → 强制跟尾 + 微调
         if self.recent_heads.count(head) >= LOOP_THRESHOLD:
             self.stats["loop_guard"] += 1
             self._nudge_offset = (self._nudge_offset + 1) % 4
             # 关键：触发后清空窗口，否则会每 tick 都命中、永远回不到找食物
             self.recent_heads.clear()
-            return self._follow_tail(snake, rect, passable, deadline=deadline)
+            return self._follow_tail(snake, rect, passable, deadline=deadline, world=world, wrap_mode=wrap_mode)
 
         foods = sorted(
             (c for c in world.foods_in_rect(*rect) if in_rect(c)),
@@ -126,9 +137,46 @@ class AIController:
             # A* 空路径不代表其它食物不可达：继续尝试下一个候选
             continue
 
-        return self._follow_tail(snake, rect, passable, deadline=deadline)
+        return self._follow_tail(snake, rect, passable, deadline=deadline, world=world, wrap_mode=wrap_mode)
 
-    def _follow_tail(self, snake, rect, passable, deadline=None):
+
+
+    # ---------- 空间评估（R5C） ----------
+    def _flood_area(self, world, snake, start, wrap_mode: bool, limit: int = 300) -> int:
+        """从 start 出发的连通可通行格数（蛇身视为墙，尾巴格可走）。"""
+        body = set(snake.body)
+        body.discard(snake.tail)
+        seen = {start}
+        q = deque([start])
+        while q and len(seen) < limit:
+            x, y = q.popleft()
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                n = (x + dx, y + dy)
+                if n in seen or n in body:
+                    continue
+                if not wrap_mode and world.is_blocked(n):
+                    continue
+                seen.add(n)
+                q.append(n)
+        return len(seen)
+
+    def _space_best_step(self, world, snake, wrap_mode: bool, rect, deadline=None):
+        """在 4 个合法方向里选「走后剩余连通空间最大」的一步。"""
+        head = snake.head
+        best, best_area = None, -1
+        for direction in ((0, 1), (1, 0), (0, -1), (-1, 0)):
+            if not self.safe_step(world, snake, direction, wrap_mode):
+                continue
+            nxt = (head[0] + direction[0], head[1] + direction[1])
+            area = self._flood_area(world, snake, nxt, wrap_mode)
+            if area > best_area:
+                best, best_area = direction, area
+        if best is None:
+            return None
+        self.path = [(head[0] + best[0], head[1] + best[1])]
+        return self.path
+
+    def _follow_tail(self, snake, rect, passable, deadline=None, world=None, wrap_mode=False):
         self.stats["follow_tail"] += 1
         tail = snake.tail
         self.state = STATE_FOLLOW_TAIL
@@ -143,6 +191,22 @@ class AIController:
 
         path = astar(snake.head, tail, passable_tail, rect, pool=self.pool,
                      max_nodes=self.max_nodes, deadline=deadline)
+        # R5C 升级：追尾时也做一次轻量洪水填充，选空间更大的岔路
+        tail_step = path[0] if path else None
+        best, best_area = None, -1
+        for direction in ((0, 1), (1, 0), (0, -1), (-1, 0)):
+            if not self.safe_step(world, snake, direction, wrap_mode):
+                continue
+            nxt = (snake.head[0] + direction[0], snake.head[1] + direction[1])
+            area = self._flood_area(world, snake, nxt, wrap_mode)
+            if tail_step is not None and nxt == tail_step:
+                area += 1  # 优先保持朝尾巴走
+            if area > best_area:
+                best, best_area = direction, area
+        if best is not None:
+            self.path = [(snake.head[0] + best[0], snake.head[1] + best[1])]
+            self.stats.update(state=self.state, path_len=1)
+            return self.path
         self.path = path
         self.stats.update(state=self.state, path_len=len(path))
         return path

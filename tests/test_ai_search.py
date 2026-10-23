@@ -161,7 +161,8 @@ def test_controller_no_food_follows_tail():
     game = Game(3)
     game.world = world
     ai = AIController()
-    assert ai.plan(world, game.snake) == []
+    path = ai.plan(world, game.snake)
+    assert len(path) <= 1, "跟尾升级后允许返回单步方向"
     assert ai.state == "FOLLOW_TAIL"
 
 
