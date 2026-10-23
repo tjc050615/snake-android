@@ -10,8 +10,6 @@
 from __future__ import annotations
 
 import logging
-import time
-from collections import deque
 
 from ai.controller import STATE_DEAD, AIController
 
@@ -40,9 +38,6 @@ class AISession:
         self.last_direction: tuple[int, int] | None = None
         self.path: list[tuple[int, int]] = []
         self.path_tick = -1
-        self._cached: list[tuple[int, int]] = []   # 多步路径缓存
-        self._cached_len = 0
-        self.diag: deque = deque(maxlen=30)        # 死亡诊断：最后 30 tick
         self.stats = {
             "strategy": "IDLE",
             "nodes": 0,
@@ -72,9 +67,9 @@ class AISession:
              budget_s: float | None = None) -> tuple[int, int] | None:
         self.ticks += 1
         high = speed >= HIGH_SPEED
-        self.period = 1   # 实测高速下每 2 tick 决策会撞自己，改为每 tick 决策
+        self.period = 2 if high else 1
         # 留 1ms 余量给 Python 调度抖动，保证总耗时 p99 < 8ms
-        self.timeout_s = min(budget_s if budget_s is not None else (0.0035 if high else 0.0070), 0.005)
+        self.timeout_s = budget_s if budget_s is not None else (0.0035 if high else 0.0070)
         self.controller.radius_cap = 40 if high else 80
 
         # 高速档：每 2 tick 决策一次；其余每 tick
@@ -102,14 +97,6 @@ class AISession:
         if direction is not None:
             self.last_direction = direction
 
-        self.diag.append({
-            "tick": self.ticks, "head": snake.head, "dir": direction,
-            "state": self.controller.state, "len": len(snake),
-            "blocked_around": sum(
-                1 for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
-                if not world.is_passable((snake.head[0] + dx, snake.head[1] + dy))
-            ),
-        })
         self.stats["alive_ticks"] = self.ticks
         if self.ticks % self.stats_log_every == 0:
             self._log_stats()
@@ -126,34 +113,9 @@ class AISession:
         return (c[0] - snake.head[0], c[1] - snake.head[1])
 
     def _compute(self, world, snake, wrap_mode: bool) -> None:
-        # 路径缓存：还有多步可走且没被挡，就直接复用，不重算 A*
-        if self.ticks >= self.period:
-            while self._cached and self._cached[0] == snake.head:
-                self._cached.pop(0)
-        if self._cached and len(snake.body) == self._cached_len:
-            step = self._cached[0]
-            d = (step[0] - snake.head[0], step[1] - snake.head[1])
-            if abs(d[0]) + abs(d[1]) != 1:
-                self._cached = []   # 缓存路径不连续：丢弃重算
-            elif self.controller.safe_step(world, snake, d, wrap_mode):
-                self._next_path = [step]
-                self.path = [step]
-                self.path_tick = self.ticks
-                self._cached.pop(0)
-                self.stats["path_cache_hits"] = self.stats.get("path_cache_hits", 0) + 1
-                return
-
-        t0 = time.perf_counter()
+        t0 = __import__("time").perf_counter()
         self.controller.plan(world, snake, wrap_mode, deadline=t0 + self.timeout_s)
-        cost_ms = (time.perf_counter() - t0) * 1000.0
-
-        # 5ms 熔断：超时直接放弃捷径，退回沿用/跟尾
-        if cost_ms > 5.0:
-            self.stats["timeouts"] += 1
-            self._next_path = []
-            self._cached = []
-            self._accumulate(cost_ms)
-            return
+        cost_ms = (__import__("time").perf_counter() - t0) * 1000.0
 
         direction = self.controller.next_direction(snake)
         if direction is not None and self.controller.safe_step(world, snake, direction, wrap_mode):
@@ -161,8 +123,6 @@ class AISession:
         self._next_path = list(self.controller.path)
         self.path = list(self.controller.path)
         self.path_tick = self.ticks
-        self._cached = list(self.controller.path)
-        self._cached_len = len(snake.body)
         self._accumulate(cost_ms)
 
     def _reuse(self, world, snake, wrap_mode: bool):
