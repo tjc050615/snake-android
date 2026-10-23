@@ -92,6 +92,8 @@ class AISession:
                 and self.last_direction is not None
                 and self.controller.safe_step(world, snake, self.last_direction, wrap_mode)):
             self._cheap_ticks = getattr(self, "_cheap_ticks", 0) + 1
+            # 廉价帧也要累计跟尾时长，否则 controller 的强制觅食永远触发不了
+            self.controller._follow_streak += 1
             self._follow_cheap = True
             self.stats["follow_cheap"] = self.stats.get("follow_cheap", 0) + 1
             self.stats["alive_ticks"] = self.ticks
