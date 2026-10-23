@@ -84,6 +84,7 @@ class GameCanvas(Widget):
     def _rebuild_after_resize(self, _dt: float) -> None:
         self._resize_event = None
         if self.width > 0 and self.height > 0:
+            self._static_dirty = True   # 尺寸变了，背景缓存必须重建
             self._apply_metrics()
             self.rebuild()
 
