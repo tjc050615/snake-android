@@ -144,7 +144,7 @@ class AIController:
 
 
     # ---------- 空间评估（R5C） ----------
-    def _flood_area(self, world, snake, start, wrap_mode: bool, limit: int = 100) -> int:
+    def _flood_area(self, world, snake, start, wrap_mode: bool, limit: int = 120) -> int:
         """从 start 出发的连通可通行格数（蛇身视为墙，尾巴格可走）。"""
         body = set(snake.body)
         body.discard(snake.tail)
@@ -194,7 +194,7 @@ class AIController:
         path = astar(snake.head, tail, passable_tail, rect, pool=self.pool,
                      max_nodes=self.max_nodes, deadline=deadline)
         # 短蛇不需要洪泛（性能）；长蛇才做空间比较
-        if len(snake) < 70:
+        if len(snake) < 50:
             self.path = path
             self.stats.update(state=self.state, path_len=len(path))
             return path
