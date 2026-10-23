@@ -21,7 +21,7 @@ STATE_DEAD = "DEAD"
 
 # 确定性降级顺序：上 → 右 → 下 → 左（D-018）
 FALLBACK_DIRS = ((0, 1), (1, 0), (0, -1), (-1, 0))
-MAX_FOOD_CANDIDATES = 4
+MAX_FOOD_CANDIDATES = 12   # R5C：扩大候选，避免只盯最近 4 个
 LOOP_WINDOW = 20
 LOOP_THRESHOLD = 3
 

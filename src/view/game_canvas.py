@@ -17,6 +17,7 @@ from app import strings
 from app.theme import palette
 from core.colors import background_color, gradient_pair, snake_gradient
 from view.gradient_bg import gradient_texture
+from view.grid_tex import grid_tex_coords, grid_texture
 from app.fonts import font_name
 from core.camera import Camera
 from core.game import Game
@@ -204,15 +205,12 @@ class GameCanvas(Widget):
                 Color(br, bgc, bb, 1)
                 Rectangle(pos=self.pos, size=self.size)
 
-            Color(*self.colors["grid"])
-            x0, y0, x1, y1 = vp.visible_bounds()
             if self.show_grid:
-                for gx in range(x0, x1 + 1):
-                    sx = gx * g - vp.origin_x
-                    Line(points=[sx, 0, sx, self.height], width=1)
-                for gy in range(y0, y1 + 1):
-                    sy = gy * g - vp.origin_y
-                    Line(points=[0, sy, self.width, sy], width=1)
+                # 单张 16x16 平铺纹理：整屏网格 1 个 draw call（不再逐条 Line）
+                Color(*self.colors["grid"])
+                Rectangle(texture=grid_texture(), pos=self.pos, size=self.size,
+                          tex_coords=grid_tex_coords(vp.origin_x, vp.origin_y, g,
+                                                     self.width, self.height))
 
             Color(*self.colors["food"])
             food = g * 0.5
