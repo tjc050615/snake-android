@@ -8,7 +8,7 @@ on:
 jobs:
   apk:
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
+    timeout-minutes: 180
 
     steps:
       - uses: actions/checkout@v4
@@ -20,9 +20,7 @@ jobs:
 
       - name: Install system deps
         run: |
-          # ==========================================
-          # 关键修改：替换为阿里云镜像源，解决下载卡死
-          # ==========================================
+          # 替换为阿里云镜像源，解决 GitHub 网络卡顿问题
           sudo sed -i 's|http://archive.ubuntu.com|http://mirrors.aliyun.com|g' /etc/apt/sources.list
           sudo sed -i 's|http://security.ubuntu.com|http://mirrors.aliyun.com|g' /etc/apt/sources.list
           
