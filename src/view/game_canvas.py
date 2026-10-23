@@ -303,7 +303,7 @@ class GameCanvas(Widget):
             if self.head_highlight or low_contrast:
                 # 可访问性 / 低对比度兜底：蛇头外圈白色描边
                 Color(1.0, 1.0, 1.0, 0.9)
-                Line(rectangle=(hx - g / 2 + 1, hy - g / 2 + 1, g - 2, g - 2), width=2)
+                Line(circle=(hx, hy, g * 0.38), width=2)   # 圆头描边，不再是方块
 
             if low_contrast:
                 # 纯色/渐变与蛇身颜色接近时，逐节描白边，确保绝对可见
