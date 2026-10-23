@@ -113,6 +113,7 @@ class SnakeApp(App):
     viewscale_override: float | None = None
     menu_shot = False
     joystick_shot = False
+    btnprobe = False
     theme_override: str | None = None
     font_override: float | None = None
 
@@ -287,6 +288,10 @@ class SnakeApp(App):
             if self.joystick_shot:
                 Clock.schedule_once(self._fake_joystick, 0.5)
                 Clock.schedule_once(lambda _dt: self._shot("joystick"), 1.0)
+            if self.btnprobe:
+                Clock.schedule_once(lambda _dt: self._toggle_menu(), 0.4)
+                Clock.schedule_once(self._probe_speed_buttons, 0.8)
+                Clock.schedule_once(lambda _dt: self._shot("btnprobe"), 1.2)
             if self.menu_shot:
                 Clock.schedule_once(lambda _dt: self._toggle_menu(), 0.4)
                 Clock.schedule_once(lambda _dt: self._shot("menu"), 0.9)
@@ -459,6 +464,11 @@ class SnakeApp(App):
         self.ai_period = 1 if mode == "performance" else (2 if mode == "battery" else 1)
         self._ai_counter = 0
 
+    def _probe_speed_buttons(self, _dt: float) -> None:
+        """冒烟：点一遍 1x/2x/4x，验证不崩。"""
+        for value in (2.0, 4.0, 1.0):
+            self.panel._set_speed(value)
+
     def _ui_tap(self) -> None:
         self.haptics.vibrate_ms(20)
 
@@ -493,7 +503,7 @@ class SnakeApp(App):
 
     def _cycle_speed(self, value: float | None = None) -> None:
         self.speed = float(value) if value is not None else self.speed
-        speed = min(speed, 4.0)
+        self.speed = min(self.speed, 4.0)
         self.game.clock.set_speed(self.speed)
         self._apply_chunk_throughput()
         self.panel.speed = self.speed

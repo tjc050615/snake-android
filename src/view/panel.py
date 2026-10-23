@@ -143,6 +143,12 @@ class Panel(ThemedMixin, BoxLayout):
             self._on_speed()
         self.refresh()
 
+    def _tap(self) -> None:
+        """UI 点击震动钩子（未接线时安全 no-op）。"""
+        cb = getattr(self, "_on_tap", None)
+        if cb is not None:
+            cb()
+
     def _set_speed(self, value: float) -> None:
         self._tap()
         if self._on_speed is not None:
