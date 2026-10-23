@@ -21,7 +21,8 @@ STATE_DEAD = "DEAD"
 
 # 确定性降级顺序：上 → 右 → 下 → 左（D-018）
 FALLBACK_DIRS = ((0, 1), (1, 0), (0, -1), (-1, 0))
-MAX_FOOD_CANDIDATES = 12   # R5C：扩大候选，避免只盯最近 4 个
+MAX_FOOD_CANDIDATES = 12
+EMERGENCY_FACTOR = 1.5   # 剩余空间 < 蛇长 × 系数 → 紧急保底   # R5C：扩大候选，避免只盯最近 4 个
 LOOP_WINDOW = 20
 LOOP_THRESHOLD = 3
 
@@ -236,7 +237,9 @@ class AIController:
             if not wrap_mode and world.is_blocked(c):
                 continue
             free += 1
-        return free >= 1
+        # 长蛇：走完后至少要有 2 个出口，避免走进死胡同
+        need = 1
+        return free >= need
 
     def fallback_direction(self, world, snake, wrap_mode: bool = False, offset: int = 0):
         """严格按 上→右→下→左（可整体旋转 offset）取第一个通过 O(1) 校验的方向。"""
