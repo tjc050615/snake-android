@@ -45,6 +45,7 @@ class AIController:
         self.path: list[tuple[int, int]] = []
         self.recent_heads: deque[tuple[int, int]] = deque(maxlen=LOOP_WINDOW)
         self.flood_limit = 40
+        self._follow_streak = 0   # 连续跟尾 tick 数
         self.margin_small = 2
         self.margin_large = 8
         self.radius_cap = 80  # 高速档由会话改成 40（D-040）
@@ -142,6 +143,18 @@ class AIController:
             # A* 空路径不代表其它食物不可达：继续尝试下一个候选
             continue
 
+        # 摆烂保护：连续跟尾 >100 tick，强制尝试最近食物（level1 安全即可）
+        if self._follow_streak > 100 and foods and (deadline is None or time.perf_counter() < deadline):
+            nearest = foods[0]
+            if safety.level1_reachable(world, snake, nearest, wrap_mode, deadline=deadline):
+                path = astar(head, nearest, passable, rect, pool=self.pool,
+                             max_nodes=self.max_nodes, deadline=deadline)
+                if path:
+                    self.path = path
+                    self.state = STATE_SEEKING_FOOD
+                    self.stats["forced_feed"] = self.stats.get("forced_feed", 0) + 1
+                    self._follow_streak = 0
+                    return path
         return self._follow_tail(snake, rect, passable, deadline=deadline, world=world, wrap_mode=wrap_mode)
 
 
@@ -184,6 +197,7 @@ class AIController:
 
     def _follow_tail(self, snake, rect, passable, deadline=None, world=None, wrap_mode=False):
         self.stats["follow_tail"] += 1
+        self._follow_streak += 1
         tail = snake.tail
         self.state = STATE_FOLLOW_TAIL
         if tail == snake.head:
