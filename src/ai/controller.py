@@ -46,6 +46,7 @@ class AIController:
         self.recent_heads: deque[tuple[int, int]] = deque(maxlen=LOOP_WINDOW)
         self.flood_limit = 40
         self._follow_streak = 0   # 连续跟尾 tick 数
+        self._bad_food = {}       # 食物 -> 过期 plan 计数（幽灵食物标记）
         self.margin_small = 2
         self.margin_large = 8
         self.radius_cap = 80  # 高速档由会话改成 40（D-040）
@@ -123,6 +124,8 @@ class AIController:
             key=lambda c: (manhattan(head, c), c[0], c[1]),
         )
 
+        plans_now = self.stats["plans"]
+        foods = [f for f in foods if self._bad_food.get(f, -1) < plans_now]
         for food in foods[:MAX_FOOD_CANDIDATES]:
             if deadline is not None and time.perf_counter() > deadline:
                 break  # 预算耗尽：不再尝试更多候选，直接走兜底

@@ -76,6 +76,9 @@ class AISession:
         elif len(snake) > self._last_len:
             self.stats["eaten"] += len(snake) - self._last_len
         self._last_len = len(snake)
+        self._stall = getattr(self, "_stall", 0)
+        self._last_target = getattr(self, "_last_target", None)
+        self._last_dist = getattr(self, "_last_dist", None)
         high = speed >= HIGH_SPEED
         self.period = 2 if high else 1
         # 留 1ms 余量给 Python 调度抖动，保证总耗时 p99 < 8ms
@@ -121,6 +124,24 @@ class AISession:
             direction = self._reuse(world, snake, wrap_mode)
             self.stats["no_decision_reuse"] += 1
             self.stats["reuse"] = self.stats["no_decision_reuse"]
+
+        # 幽灵路径检测：目标不变且距离连续 8 tick 未缩短 → 标记死食物、强制重算
+        target = self.controller.path[-1] if self.controller.path else None
+        if target is not None:
+            dist = abs(target[0] - snake.head[0]) + abs(target[1] - snake.head[1])
+            if target == self._last_target and self._last_dist is not None and dist >= self._last_dist:
+                self._stall += 1
+            else:
+                self._stall = 0
+            self._last_target, self._last_dist = target, dist
+            if self._stall >= 8:
+                self.controller._bad_food[target] = self.controller.stats["plans"] + 200
+                self.controller._follow_streak = 999
+                self.controller.path = []
+                self.stats["ghost_food"] = self.stats.get("ghost_food", 0) + 1
+                self._stall = 0
+        else:
+            self._stall = 0
 
         if direction is not None:
             self.last_direction = direction
