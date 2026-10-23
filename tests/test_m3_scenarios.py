@@ -19,7 +19,7 @@ def _drive(game: Game, session: AISession) -> None:
 
 
 def _play(seed: int, ticks: int, wrap: bool = False):
-    game = Game(seed)
+    game = Game(seed, deterministic_food=True)
     mgr = ChunkManager(game.world)
     session = AISession()
     if wrap:

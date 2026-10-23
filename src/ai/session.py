@@ -20,7 +20,7 @@ HIGH_SPEED = 5.0
 
 class AISession:
     def __init__(self, tick_hz: int = 10, stats_log_hz: float = 2.0,
-                 deterministic: bool = False) -> None:
+                 deterministic: bool = True) -> None:
         self.deterministic = bool(deterministic)
         self.controller = AIController()
         if self.deterministic:
