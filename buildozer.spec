@@ -8,7 +8,9 @@ source.include_exts = py,png,jpg,ttf,otf,wav,json
 source.include_patterns = assets/fonts/*,src/**/*,main.py
 source.exclude_dirs = tests,tools,docs,.venv,.data,.git,.kivyhome,__pycache__,.pytest_cache
 source.exclude_patterns = docs/*,docs/evidence/*,tests/*,tools/*,*.md,requirements*.txt
-requirements = python3,kivy==2.3.0,pyjnius,cython==0.29.33
+
+# 【核心修改】强制锁定 Python 版本为 3.11.15，避免自动拉取 3.14 导致底层 C 语言编译报错
+requirements = python3==3.11.15,hostpython3==3.11.15,kivy==2.3.0,pyjnius,cython==0.29.33
 
 # 版本锁定（不要用最新版）：
 #   buildozer==1.5.0
