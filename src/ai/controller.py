@@ -124,6 +124,8 @@ class AIController:
             (c for c in world.foods_in_rect(*rect) if in_rect(c)),
             key=lambda c: (manhattan(head, c), c[0], c[1]),
         )
+        if not foods:   # 视野内没有 → 全图找最近的，绝不放空
+            foods = sorted(world.foods(), key=lambda c: (manhattan(head, c), c[0], c[1]))
 
         plans_now = self.stats["plans"]
         foods = [f for f in foods if self._bad_food.get(f, -1) < plans_now]

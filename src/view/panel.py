@@ -76,11 +76,15 @@ class Panel(ThemedMixin, BoxLayout):
         self.btn_ai = Button(text='', font_name=FONT_NAME, font_size=16.0,
                              size_hint_y=None, height=56)
         self.btn_ai.bind(on_release=lambda *_: self._ai())
-        self.btn_speed = Button(text='', font_name=FONT_NAME, font_size=16.0,
-                                size_hint_y=None, height=56)
-        self.btn_speed.bind(on_release=lambda *_: self._speed())
+        self.speed_row = BoxLayout(size_hint_y=None, height=56, spacing=4)
+        self.speed_buttons = {}
+        for _v in (1.0, 2.0, 4.0, 8.0, 16.0):
+            b = Button(text=f"{_v:g}x", font_name=FONT_NAME, font_size=14.0)
+            b.bind(on_release=lambda _w, v=_v: self._set_speed(v))
+            self.speed_row.add_widget(b)
+            self.speed_buttons[_v] = b
         self.add_widget(self.btn_ai)
-        self.add_widget(self.btn_speed)
+        self.add_widget(self.speed_row)
         self.add_widget(self.btn_settings)
         self.add_widget(Label(text="", size_hint_y=1))  # 弹性占位
 
@@ -101,7 +105,10 @@ class Panel(ThemedMixin, BoxLayout):
             pass
         self.btn_stats.text = strings.t("ai_stats")
         self.btn_ai.text = strings.t("ai_off") if getattr(self, "ai_active", False) else strings.t("ai_on")
-        self.btn_speed.text = f"{getattr(self, 'speed', 1.0):g}x"
+        current = getattr(self, "speed", 1.0)
+        for v, b in getattr(self, "speed_buttons", {}).items():
+            b.background_color = ((0.25, 0.55, 0.95, 1) if abs(v - current) < 1e-6
+                                  else (0.22, 0.24, 0.29, 1))
 
     # ---------- 事件 ----------
     def _wrap(self) -> None:

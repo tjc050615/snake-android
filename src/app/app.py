@@ -491,13 +491,8 @@ class SnakeApp(App):
         self.panel.ai_active = self.session is not None
         self.canvas_widget.ai_path = []
 
-    def _cycle_speed(self) -> None:
-        speeds = (1.0, 2.0, 4.0, 8.0, 16.0)
-        try:
-            idx = speeds.index(round(self.speed, 1))
-        except ValueError:
-            idx = 0
-        self.speed = speeds[(idx + 1) % len(speeds)]
+    def _cycle_speed(self, value: float | None = None) -> None:
+        self.speed = float(value) if value is not None else self.speed
         self.game.clock.set_speed(self.speed)
         self._apply_chunk_throughput()
         self.panel.speed = self.speed

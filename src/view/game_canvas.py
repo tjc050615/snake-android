@@ -289,14 +289,14 @@ class GameCanvas(Widget):
                 cell = cells[idx]
                 px, py = to_pixel(cell, g, vp.origin_x, vp.origin_y)
                 if -g <= px <= self.width + g and -g <= py <= self.height + g:
-                    Rectangle(
+                    Ellipse(
                         pos=(px - g / 2 + pad_snake, py - g / 2 + pad_snake),
                         size=(g - 2 * pad_snake, g - 2 * pad_snake),
                     )
 
             Color(grad[0][0], grad[0][1], grad[0][2], 1)
             hx, hy = to_pixel(cells[0], g, vp.origin_x, vp.origin_y)
-            Rectangle(
+            Ellipse(
                 pos=(hx - g / 2 + pad_snake, hy - g / 2 + pad_snake),
                 size=(g - 2 * pad_snake, g - 2 * pad_snake),
             )

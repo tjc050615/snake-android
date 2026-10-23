@@ -63,10 +63,14 @@ def ensure_local_food(world, snake, rng: random.Random, radius: int = 10):
         return sum(1 for c in world.foods()
                    if abs(c[0] - hx) <= r and abs(c[1] - hy) <= r)
 
-    if world.food_count() >= 5:
-        return None
     if near_count(radius) >= 2:
         return None
+    if world.food_count() >= 5:
+        # 满 5 个但都不在附近：把最远的挪到蛇头附近，保证"看得见食物"
+        far = sorted(world.foods(),
+                     key=lambda c: -(abs(c[0] - hx) + abs(c[1] - hy)))
+        if far and abs(far[0][0] - hx) + abs(far[0][1] - hy) > radius:
+            world.discard_food(far[0])
 
     body = set(snake.body)
     for r in (radius, radius * 2, radius * 3):
