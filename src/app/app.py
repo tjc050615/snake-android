@@ -205,6 +205,7 @@ class SnakeApp(App):
         self.canvas_widget.set_background(self.cfg.get("bg_mode", "solid"), self.cfg.get("bg_index", 0))
         self.canvas_widget.set_view_zoom(float(self.cfg.get("view_zoom", 1.0)))
         self._apply_perf()
+        self._apply_chunk_throughput()
         self.canvas_widget.apply_view_options(
             self.cfg.get("show_grid", True), self.cfg.get("head_highlight", True)
         )
@@ -426,6 +427,16 @@ class SnakeApp(App):
         except Exception:
             pass
 
+    def _apply_chunk_throughput(self) -> None:
+        """16x 时 chunk 生成必须跟得上：提高每帧生成上限并加预加载圈。"""
+        speed = float(self.speed)
+        per = 16 if speed >= 8 else (8 if speed >= 4 else 2)
+        self.chunk_mgr.max_generate_per_update = per
+        want_rings = 3 if speed >= 8 else 2
+        if self.chunk_mgr.preload_rings != want_rings:
+            self.chunk_mgr.preload_rings = want_rings
+            self.chunk_mgr.unload_rings = max(self.chunk_mgr.unload_rings, want_rings + 1)
+
     def _apply_perf(self) -> None:
         """帧率上限 + 性能模式联动（高性能 120 / 省电 60，AI 频率相应变化）。"""
         mode = self.cfg.get("perf_mode", "balanced")
@@ -477,6 +488,7 @@ class SnakeApp(App):
             idx = 0
         self.speed = speeds[(idx + 1) % len(speeds)]
         self.game.clock.set_speed(self.speed)
+        self._apply_chunk_throughput()
         self.panel.speed = self.speed
 
     def _toggle_pause(self) -> None:
