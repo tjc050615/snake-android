@@ -45,6 +45,7 @@ from core.debug import DebugStats
 from core.audio import Haptics, SoundManager
 from core.confirm import ConfirmState
 from core.frame_budget import chunk_slot, forced_chunk_frame
+from core.input_queue import InputQueue
 from core.replay import Recorder
 from core.replay_player import ReplayDriver
 from core.replay_controls import ReplayControls
@@ -105,6 +106,7 @@ class SnakeApp(App):
     replaypause_shot = False
     bg_demo = False
     menu_shot = False
+    joystick_shot = False
     theme_override: str | None = None
     font_override: float | None = None
 
@@ -161,9 +163,11 @@ class SnakeApp(App):
         if self.wrap:
             self.game.set_wrap_mode(True)
         self.session: AISession | None = None
+        self.input_queue = InputQueue()
         if self.ai:
             self.session = AISession()
-            self.game.tick_listeners.append(self._ai_tick)
+        self.game.tick_listeners.append(self._apply_queue)
+        self.game.tick_listeners.append(self._ai_tick)
         self.canvas_widget = GameCanvas(self.game)
         self.canvas_widget.size_hint = (1.0, 1.0)
         self.canvas_widget.pos_hint = {"x": 0, "y": 0}
@@ -200,7 +204,6 @@ class SnakeApp(App):
         self.scrim = Scrim(on_tap=self._close_menu, size_hint=(1, 1))
         root.add_widget(self.scrim)
         self.scrim.show(False)
-        root.add_widget(self.panel)
         self.menu_btn = MenuButton(on_toggle=self._toggle_menu,
                                    pos_hint={'right': 0.99, 'top': 0.985})
         root.add_widget(self.menu_btn)
@@ -257,6 +260,9 @@ class SnakeApp(App):
             if self.pause_shot:
                 Clock.schedule_once(lambda _dt: self._toggle_pause(), 0.4)
                 Clock.schedule_once(lambda _dt: self._shot("pause"), 0.9)
+            if self.joystick_shot:
+                Clock.schedule_once(self._fake_joystick, 0.5)
+                Clock.schedule_once(lambda _dt: self._shot("joystick"), 1.0)
             if self.menu_shot:
                 Clock.schedule_once(lambda _dt: self._toggle_menu(), 0.4)
                 Clock.schedule_once(lambda _dt: self._shot("menu"), 0.9)
@@ -406,17 +412,24 @@ class SnakeApp(App):
             pass
 
     def _toggle_menu(self) -> None:
-        opened = self.panel.opacity > 0.5
-        if opened:
+        if getattr(self, "menu_open", False):
             self._close_menu()
-        else:
-            self.panel.opacity = 1
-            self.panel.disabled = False
-            self.scrim.show(True)
+            return
+        self.menu_open = True
+        self.panel.opacity = 1
+        self.panel.disabled = False
+        if self.panel.parent is None:
+            self.root_layout.add_widget(self.panel)
+        self.root_layout.remove_widget(self.menu_btn)
+        self.root_layout.add_widget(self.menu_btn)   # 提到最上层
+        self.scrim.show(True)
+        self.scrim.opacity = 0.35
+        self.panel.apply_theme(palette(self.cfg.get("theme", "dark")))
 
     def _close_menu(self) -> None:
-        self.panel.opacity = 0
-        self.panel.disabled = True
+        self.menu_open = False
+        if self.panel.parent is not None:
+            self.root_layout.remove_widget(self.panel)
         self.scrim.show(False)
 
     def _toggle_ai(self) -> None:
@@ -501,6 +514,20 @@ class SnakeApp(App):
         self.replay_overlay.pos_hint = {"right": 1, "top": 0.98}
         self.root_layout.add_widget(self.replay_overlay)
         self.replay_overlay.apply_theme(palette(self.cfg.get("theme", "dark")))
+
+    def _fake_joystick(self, _dt: float) -> None:
+        """截图用：模拟手指落在屏幕中心并向右滑动 70px。"""
+        class _T:
+            def __init__(self, x, y, uid):
+                self.x, self.y, self.uid = x, y, uid
+
+            @property
+            def pos(self):
+                return (self.x, self.y)
+
+        cx, cy = 640, 360
+        self.canvas_widget.on_touch_down(_T(cx, cy, 999))
+        self.canvas_widget.on_touch_move(_T(cx + 70, cy, 999))
 
     def _replay_tap(self) -> None:
         '''把后续输入放到回放驱动里，演示 2x 播放。'''
@@ -631,7 +658,14 @@ class SnakeApp(App):
         self.canvas_widget.rebuild()
 
     def _on_direction(self, direction) -> None:
-        self.game.set_direction(direction)
+        if self.replay_mode or self.confirm_state.active:
+            return
+        self.input_queue.push(direction, self.game.snake.direction)
+
+    def _apply_queue(self, game) -> None:
+        direction = self.input_queue.pop()
+        if direction is not None:
+            game.set_direction(direction)
 
     def _apply_window_size(self) -> None:
         if desktop.is_android():

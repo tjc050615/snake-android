@@ -100,6 +100,7 @@ def main() -> int:
     app.replaypause_shot = "--replaypause" in sys.argv
     app.bg_demo = "--bgdemo" in sys.argv
     app.menu_shot = "--menu" in sys.argv
+    app.joystick_shot = "--jstick" in sys.argv
     for _arg in sys.argv:
         if _arg.startswith("--theme="):
             app.theme_override = _arg.split("=", 1)[1]

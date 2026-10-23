@@ -55,7 +55,8 @@ class GameCanvas(Widget):
         self.colors = palette("dark")
         self.show_grid = True
         self.head_highlight = True
-        self._joystick = Joystick()
+        self._joystick = Joystick(swipe_px=30.0)
+        self._joy_origin = None
         self.joy_radius = 90.0
         self.on_direction = None          # 回调：direction -> None
         self._touch_uid = None
@@ -287,12 +288,9 @@ class GameCanvas(Widget):
     def on_touch_down(self, touch) -> bool:
         if not self.collide_point(*touch.pos):
             return False
-        cx, cy = self.joystick_center()
-        inside = ((touch.x - cx) ** 2 + (touch.y - cy) ** 2) ** 0.5 <= self.joy_radius * 1.15
-        if inside:
-            self._joystick.begin(cx, cy)   # 摇杆：基点固定左下
-        else:
-            self._joystick.begin(touch.x, touch.y)  # 滑动：以按下点为起点
+        # 全屏动态摇杆：手指落点即摇杆中心
+        self._joy_origin = (touch.x, touch.y)
+        self._joystick.begin(touch.x, touch.y)
         self._touch_uid = touch.uid
         return True
 
@@ -308,6 +306,7 @@ class GameCanvas(Widget):
         if touch.uid != self._touch_uid:
             return False
         self._joystick.end()
+        self._joy_origin = None
         self._touch_uid = None
         return True
 
@@ -364,10 +363,14 @@ class GameCanvas(Widget):
 
     # ---------- 虚拟摇杆（M4/R1） ----------
     def joystick_center(self) -> tuple[float, float]:
+        if self._joy_origin is not None:
+            return self._joy_origin
         r = self.joy_radius
         return (r + 24.0, r + 24.0)
 
     def _draw_joystick(self) -> None:
+        if not self._joystick.active:
+            return   # 松手后摇杆消失
         cx, cy = self.joystick_center()
         r = self.joy_radius
         Color(1, 1, 1, 0.12)

@@ -10,8 +10,8 @@ from kivy.graphics.texture import Texture
 from core.colors import gradient_pair
 
 _CACHE: dict[int, Texture] = {}
-H = 256
-W = 8
+H = 2   # 只用两端颜色，GPU 线性过滤拉伸 → 无 banding
+W = 2
 
 
 def gradient_texture(index: int) -> Texture:
@@ -22,12 +22,9 @@ def gradient_texture(index: int) -> Texture:
 
     top, bottom = gradient_pair(index)
     buf = bytearray(W * H * 4)
-    for y in range(H):
-        t = y / (H - 1)
-        r = int(round((top[0] + (bottom[0] - top[0]) * t) * 255))
-        g = int(round((top[1] + (bottom[1] - top[1]) * t) * 255))
-        b = int(round((top[2] + (bottom[2] - top[2]) * t) * 255))
-        row = bytes((r, g, b, 255)) * W
+    for y, c in enumerate((top, bottom)):
+        row = bytes((int(round(c[0] * 255)), int(round(c[1] * 255)),
+                     int(round(c[2] * 255)), 255)) * W
         buf[y * W * 4:(y + 1) * W * 4] = row
 
     tex = Texture.create(size=(W, H))

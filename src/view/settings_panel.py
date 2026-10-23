@@ -14,7 +14,7 @@ from kivy.uix.gridlayout import GridLayout
 from kivy.uix.label import Label
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.slider import Slider
-from kivy.uix.spinner import Spinner
+from kivy.uix.spinner import Spinner, SpinnerOption
 from kivy.uix.checkbox import CheckBox
 
 from app import strings
@@ -22,9 +22,22 @@ from app.fonts import FONT_NAME
 from app.theme import palette
 from view.themed import ThemedMixin
 from core.layout import content_height
+from app.strings import GRADIENT_NAMES, SOLID_NAMES
 from data.storage import PERF_MODES, THEMES
 
 ROW_H = 56.0
+
+
+class DarkOption(SpinnerOption):
+    """下拉选项：深底白字，避免默认灰底灰字。"""
+
+    def __init__(self, **kw) -> None:
+        kw.setdefault("font_name", FONT_NAME)
+        kw.setdefault("font_size", 14.0)
+        super().__init__(**kw)
+        self.background_normal = ""
+        self.background_color = (0.13, 0.16, 0.22, 1)
+        self.color = (1, 1, 1, 1)
 
 # config key → strings key
 LABEL_KEY = {
@@ -129,6 +142,10 @@ class SettingsOverlay(ThemedMixin, BoxLayout):
         sp = Spinner(
             text=label_map[self.cfg[key]], values=[label_map[v] for v in values],
             font_name=FONT_NAME, font_size=self._fs(14), size_hint_x=None, width=170,
+            option_cls=DarkOption,
+            background_normal="",
+            background_color=(0.13, 0.16, 0.22, 1),
+            color=(1, 1, 1, 1),
         )
         back = {label_map[v]: v for v in values}
 
@@ -151,7 +168,8 @@ class SettingsOverlay(ThemedMixin, BoxLayout):
         self._choice_row("bg_mode", ("solid", "gradient"),
                          {"solid": strings.t("bg_solid"), "gradient": strings.t("bg_gradient")})
         self._slider_row("view_scale", 0.6, 2.0)
-        self._choice_row("bg_index", tuple(range(16)), {i: str(i) for i in range(16)})
+        names = GRADIENT_NAMES if self.cfg.get("bg_mode") == "gradient" else SOLID_NAMES
+        self._choice_row("bg_index", tuple(range(16)), {i: names[i] for i in range(16)})
         self._switch_row("show_fps")
         self._choice_row(
             "perf_mode", PERF_MODES,

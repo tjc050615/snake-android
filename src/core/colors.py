@@ -41,3 +41,10 @@ def snake_gradient(length: int, hue_offset: float = 0.0) -> list[tuple[float, fl
         rgb = colorsys.hsv_to_rgb(hue, 0.65, 1.0 - 0.45 * t)  # 尾部压暗
         out.append(rgb)
     return out
+
+
+def background_name(mode: str, index: int) -> str:
+    from app.strings import GRADIENT_NAMES, SOLID_NAMES
+
+    table = GRADIENT_NAMES if mode == "gradient" else SOLID_NAMES
+    return table[int(index) % 16]
