@@ -52,24 +52,36 @@ def reroll_foods(world, snake, rng: random.Random) -> None:
         world.add_food(cell)
 
 
-def ensure_local_food(world, snake, rng: random.Random, radius: int = 25):
-    """保证蛇头附近有食物：AI 搜索半径内看不到食物时补一个（Bug 3）。
+def ensure_local_food(world, snake, rng: random.Random, radius: int = 10):
+    """保证蛇头附近有食物：直接在头周围窗口里找空格（不依赖 chunk 遍历顺序）。
 
-    只放在已加载、可通行、非蛇身的格子上；返回新食物坐标或 None。
+    视野内已有 >=2 个食物则不动；否则在半径 radius 内补一个，找不到再扩到 2 倍。
     """
     hx, hy = snake.head
-    for cell in world.foods():
-        if abs(cell[0] - hx) <= radius and abs(cell[1] - hy) <= radius:
-            return None
-    cells = [
-        c for c in free_cells(world, snake, limit=8192)
-        if abs(c[0] - hx) <= radius and abs(c[1] - hy) <= radius
-    ]
-    if not cells:
+
+    def near_count(r):
+        return sum(1 for c in world.foods()
+                   if abs(c[0] - hx) <= r and abs(c[1] - hy) <= r)
+
+    if near_count(radius) >= 2:
         return None
-    cell = rng.choice(cells)
-    world.add_food(cell)
-    return cell
+
+    body = set(snake.body)
+    for r in (radius, radius * 2, radius * 3):
+        cells = []
+        for x in range(hx - r, hx + r + 1):
+            for y in range(hy - r, hy + r + 1):
+                cell = (x, y)
+                if cell in body or cell in world.foods():
+                    continue
+                if world.is_blocked(cell):
+                    continue
+                cells.append(cell)
+        if cells:
+            cell = rng.choice(cells)
+            world.add_food(cell)
+            return cell
+    return None
 
 
 def ensure_food(world, snake, rng: random.Random) -> tuple[int, int] | None:

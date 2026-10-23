@@ -59,6 +59,7 @@ class Game:
         # deterministic_food=True 仅用于回放/种子复现测试
         self.food_rng = food_mod.food_rng(self.seed) if self.deterministic_food else food_mod.entropy_rng()
         food_mod.reroll_foods(self.world, self.snake, self.food_rng)
+        food_mod.ensure_local_food(self.world, self.snake, self.food_rng)  # 开局必须有食物
 
     # ---------- 输入 ----------
     def set_direction(self, direction: tuple[int, int]) -> bool:
