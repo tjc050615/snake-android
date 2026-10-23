@@ -39,7 +39,7 @@ def test_pending_save_flushed_on_app_stop():
 
 # ---------- 回放确定性 ----------
 def _play(script, seed=42, mode=MODE_HUMAN, mode_script=None):
-    game = Game(seed)
+    game = Game(seed, deterministic_food=True)
     rec = Recorder(seed, mode)
     snaps = []
     for i, d in enumerate(script):
@@ -54,7 +54,7 @@ def _play(script, seed=42, mode=MODE_HUMAN, mode_script=None):
 
 
 def _replay(payload, ticks):
-    game = Game(payload["seed"])
+    game = Game(payload["seed"], deterministic_food=True)
     player = Player(payload)
     snaps = []
     for tick in range(ticks):

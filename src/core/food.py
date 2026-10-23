@@ -10,6 +10,11 @@ from __future__ import annotations
 import random
 
 
+def entropy_rng() -> random.Random:
+    """系统熵：每次开局食物位置都不同。"""
+    return random.Random()
+
+
 def food_rng(seed: int) -> random.Random:
     return random.Random((int(seed) * 2654435761) & 0xFFFFFFFF)
 

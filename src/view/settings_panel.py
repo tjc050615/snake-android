@@ -40,6 +40,8 @@ LABEL_KEY = {
     "head_highlight": "head_highlight",
     "show_grid": "show_grid",
     "font_size": "font_size",
+    "bg_mode": "bg",
+    "bg_index": "bg_index",
 }
 
 
@@ -145,6 +147,9 @@ class SettingsOverlay(ThemedMixin, BoxLayout):
             {"dark": strings.t("theme_dark"), "light": strings.t("theme_light"),
              "high_contrast": strings.t("theme_high_contrast")},
         )
+        self._choice_row("bg_mode", ("solid", "gradient"),
+                         {"solid": strings.t("bg_solid"), "gradient": strings.t("bg_gradient")})
+        self._choice_row("bg_index", tuple(range(16)), {i: str(i) for i in range(16)})
         self._switch_row("show_fps")
         self._choice_row(
             "perf_mode", PERF_MODES,

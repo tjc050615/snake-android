@@ -65,7 +65,8 @@ def test_leaving_chunk_does_not_kill():
 
 
 def test_restart_uses_same_seed_world():
+    """地图/障碍仍由 seed 决定；食物已改为纯随机（用户确认）。"""
     game = Game(99)
-    foods_before = set(game.world.foods())
+    blocked_before = set(game.world.blocked())
     game.reset(game.seed)
-    assert set(game.world.foods()) == foods_before
+    assert set(game.world.blocked()) == blocked_before

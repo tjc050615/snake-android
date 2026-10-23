@@ -9,7 +9,7 @@ from core.replay_player import ReplayDriver
 
 
 def _record(script, seed=42, ticks=None):
-    game = Game(seed)
+    game = Game(seed, deterministic_food=True)
     rec = Recorder(seed, "human")
     heads = []
     for i, d in enumerate(script):
@@ -33,7 +33,7 @@ def _script(n=140):
 
 def test_replay_ui_advances_snake():
     payload, heads = _record(_script())
-    game = Game(payload["seed"])
+    game = Game(payload["seed"], deterministic_food=True)
     driver = ReplayDriver(game, payload)
 
     played = 0
@@ -46,7 +46,7 @@ def test_replay_ui_advances_snake():
 
 def test_replay_pause_freezes_snake():
     payload, _heads = _record(_script())
-    game = Game(payload["seed"])
+    game = Game(payload["seed"], deterministic_food=True)
     driver = ReplayDriver(game, payload)
     driver.step(5)
     before = tuple(game.snake.head)
@@ -63,11 +63,11 @@ def test_replay_pause_freezes_snake():
 def test_replay_speed_affects_tick_rate():
     payload, _heads = _record(_script())
 
-    g1 = Game(payload["seed"])
+    g1 = Game(payload["seed"], deterministic_food=True)
     d1 = ReplayDriver(g1, payload, speed_index=1)   # 1x
     n1 = d1.advance(0.5)
 
-    g4 = Game(payload["seed"])
+    g4 = Game(payload["seed"], deterministic_food=True)
     d4 = ReplayDriver(g4, payload, speed_index=3)   # 4x
     n4 = d4.advance(0.5)
 
@@ -76,7 +76,7 @@ def test_replay_speed_affects_tick_rate():
 
 def test_replay_end_stops():
     payload, heads = _record(_script(30))
-    game = Game(payload["seed"])
+    game = Game(payload["seed"], deterministic_food=True)
     driver = ReplayDriver(game, payload)
     total = payload["ticks"]
 

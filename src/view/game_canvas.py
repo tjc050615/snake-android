@@ -15,6 +15,7 @@ from kivy.uix.widget import Widget
 from app import constants as C
 from app import strings
 from app.theme import palette
+from core.colors import background_color, gradient_pair, snake_gradient
 from app.fonts import font_name
 from core.camera import Camera
 from core.game import Game
@@ -184,8 +185,17 @@ class GameCanvas(Widget):
 
         g = vp.grid_size
         with self.canvas:
-            Color(*self.colors["bg"])
-            Rectangle(pos=self.pos, size=self.size)
+            if self.bg_mode == "gradient":
+                a, b = gradient_pair(self.bg_index)
+                Color(a[0], a[1], a[2], 1)
+                Rectangle(pos=(self.x, self.y + self.height / 2),
+                          size=(self.width, self.height / 2 + 1))
+                Color(b[0], b[1], b[2], 1)
+                Rectangle(pos=self.pos, size=(self.width, self.height / 2 + 1))
+            else:
+                r, g, bl = background_color(self.bg_index)
+                Color(r, g, bl, 1)
+                Rectangle(pos=self.pos, size=self.size)
 
             Color(*self.colors["grid"])
             x0, y0, x1, y1 = vp.visible_bounds()
@@ -240,8 +250,9 @@ class GameCanvas(Widget):
             cells = segment_cells(self.game.snake, self.game.tick_progress, self._cells_buf)
             pad_snake = 1.0
 
-            Color(*self.colors["body"])
+            grad = snake_gradient(len(cells), self.snake_hue)
             for idx in range(1, len(cells)):
+                Color(grad[idx][0], grad[idx][1], grad[idx][2], 1)
                 cell = cells[idx]
                 px, py = to_pixel(cell, g, vp.origin_x, vp.origin_y)
                 if -g <= px <= self.width + g and -g <= py <= self.height + g:
@@ -250,7 +261,7 @@ class GameCanvas(Widget):
                         size=(g - 2 * pad_snake, g - 2 * pad_snake),
                     )
 
-            Color(*self.colors["head"])
+            Color(grad[0][0], grad[0][1], grad[0][2], 1)
             hx, hy = to_pixel(cells[0], g, vp.origin_x, vp.origin_y)
             Rectangle(
                 pos=(hx - g / 2 + pad_snake, hy - g / 2 + pad_snake),
@@ -323,9 +334,10 @@ class GameCanvas(Widget):
             self.rebuild()
 
     def set_background(self, mode: str, index: int) -> None:
-        """背景选择（视觉应用待恢复：当前仅保存状态，避免渲染回归）。"""
-        self.bg_mode = str(mode)
+        """背景选择：solid / gradient，index 0~15（实时重建）。"""
+        self.bg_mode = "gradient" if mode == "gradient" else "solid"
         self.bg_index = int(index) % 16
+        self.rebuild()
 
     def set_theme(self, name: str) -> None:
         self.colors = palette(name)

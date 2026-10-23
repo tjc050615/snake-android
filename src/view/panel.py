@@ -19,7 +19,7 @@ from view.themed import ThemedMixin
 class Panel(ThemedMixin, BoxLayout):
     def __init__(self, game, on_wrap=None, on_restart=None, on_settings=None,
                  on_history=None, on_achievements=None, on_stats=None,
-                 on_ai=None, on_speed=None, **kwargs) -> None:
+                 on_ai=None, on_speed=None, on_ai_stats=None, **kwargs) -> None:
         super().__init__(orientation="vertical", padding=12, spacing=10, **kwargs)
         self.game = game
         self._on_wrap = on_wrap

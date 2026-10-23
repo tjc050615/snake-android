@@ -19,9 +19,16 @@ def test_food_not_fixed_across_seeds():
     assert a.world.foods() != b.world.foods(), "不同 seed 食物布局应不同"
 
 
-def test_food_reproducible_for_same_seed():
-    a = Game(42)
-    b = Game(42)
+def test_food_pure_random_each_run():
+    """用户已确认：放弃跨 seed 复现，每次开局食物位置不同。"""
+    samples = {frozenset(Game(42).world.foods()) for _ in range(5)}
+    assert len(samples) > 1, "同 seed 多次开局食物应不同"
+
+
+def test_food_deterministic_mode_for_replay():
+    """回放/种子复现测试仍可用 deterministic_food=True 保留确定性。"""
+    a = Game(42, deterministic_food=True)
+    b = Game(42, deterministic_food=True)
     assert a.world.foods() == b.world.foods()
 
 

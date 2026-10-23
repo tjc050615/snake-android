@@ -7,7 +7,7 @@ from core.replay_player import ReplayDriver
 
 
 def _record(script, seed=7, mode=MODE_HUMAN, switch_at=None):
-    game = Game(seed)
+    game = Game(seed, deterministic_food=True)
     rec = Recorder(seed, mode)
     heads = []
     for i, d in enumerate(script):
@@ -30,7 +30,7 @@ def _script(n=120):
 
 
 def _replay_heads(payload, ticks):
-    game = Game(payload["seed"])
+    game = Game(payload["seed"], deterministic_food=True)
     driver = ReplayDriver(game, payload)
     out = []
     while driver.progress()[0] < min(ticks, payload["ticks"]):
@@ -58,7 +58,7 @@ def test_replay_ui_mode_switch():
 
 def test_replay_end_text_same_frame():
     payload, _heads = _record(_script(20))
-    game = Game(payload["seed"])
+    game = Game(payload["seed"], deterministic_food=True)
     driver = ReplayDriver(game, payload)
 
     driver.step(payload["ticks"])

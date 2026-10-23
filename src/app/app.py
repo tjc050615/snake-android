@@ -102,6 +102,7 @@ class SnakeApp(App):
     replayui_shot = False
     confirm_shot = False
     replaypause_shot = False
+    bg_demo = False
     theme_override: str | None = None
     font_override: float | None = None
 
@@ -145,6 +146,9 @@ class SnakeApp(App):
             self.cfg["theme"] = self.theme_override
         if self.font_override:
             self.cfg["font_size"] = self.font_override
+        if self.bg_demo:
+            self.cfg["bg_mode"] = "gradient"
+            self.cfg["bg_index"] = 3
         self.game = Game(DEFAULT_SEED)
         self.recorder = Recorder(self.game.seed, 'human')
         self.game.clock.set_speed(self.speed)

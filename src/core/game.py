@@ -28,8 +28,9 @@ class TickSummary:
 class Game:
     """一局游戏。reset() 之后即可复用实例。"""
 
-    def __init__(self, seed: int = 0) -> None:
+    def __init__(self, seed: int = 0, deterministic_food: bool = False) -> None:
         self.seed = int(seed)
+        self.deterministic_food = bool(deterministic_food)
         # 穿墙模式（D-025）：True 时忽略障碍/墙壁，但自撞仍然死
         self.wrap_mode = False
         # 每个逻辑 tick 开始前的回调（AI 等），回调内可调用 set_direction
@@ -52,7 +53,9 @@ class Game:
         self.score = 0
         self.ticks = 0
         # 食物随机化：由 seed 派生（同 seed 可复现，不同 seed 不同布局）
-        self.food_rng = food_mod.food_rng(self.seed)
+        # 纯随机（默认，跨 seed 不可复现，用户已确认放弃回放确定性）
+        # deterministic_food=True 仅用于回放/种子复现测试
+        self.food_rng = food_mod.food_rng(self.seed) if self.deterministic_food else food_mod.entropy_rng()
         food_mod.reroll_foods(self.world, self.snake, self.food_rng)
 
     # ---------- 输入 ----------
