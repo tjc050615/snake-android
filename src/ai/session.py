@@ -85,9 +85,8 @@ class AISession:
         # FOLLOW_TAIL 省钱模式：仅当「附近确实没食物」且连续使用不超过 12 tick
         near_food = any(abs(c[0] - snake.head[0]) <= 30 and abs(c[1] - snake.head[1]) <= 30
                         for c in world.foods())
-        cheap_ok = (not near_food and world.food_count() == 0) or (
-            not near_food and getattr(self, "_cheap_ticks", 0) < 12
-        )
+        # 只在「全场确实一个食物都没有」时才允许廉价模式；有食物就必须正常规划
+        cheap_ok = world.food_count() == 0
         if (cheap_ok and self.controller.state == "FOLLOW_TAIL"
                 and self.last_direction is not None
                 and self.controller.safe_step(world, snake, self.last_direction, wrap_mode)):
