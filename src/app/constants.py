@@ -49,3 +49,6 @@ REPLAY_MAX_BYTES = 100 * 1024    # D-032
 
 # --- 渲染 ---
 RENDER_FPS_TARGET = 60           # D-037（架构基线；M5 真机再谈 90~120）
+
+# 纯空地模式：关闭随机障碍与墙壁生成（用户需求变更）
+OBSTACLES_ENABLED = False

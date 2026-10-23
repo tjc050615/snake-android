@@ -97,7 +97,8 @@ class AIController:
         # R5C 紧急保底：剩余空间 < 蛇长时，立刻改走「最大连通空间」方向
         if self.stats["plans"] % 1 == 0:
             area = self._flood_area(world, snake, head, wrap_mode)
-            if len(snake) >= 10 and area < len(snake) + 2:
+            margin = 2 if len(snake) < 50 else 8
+            if len(snake) >= 10 and area < len(snake) + margin:
                 path = self._space_best_step(world, snake, wrap_mode, rect, deadline=deadline)
                 if path:
                     self.state = "EMERGENCY"
@@ -238,7 +239,7 @@ class AIController:
                 continue
             free += 1
         # 长蛇：走完后至少要有 2 个出口，避免走进死胡同
-        need = 1
+        need = 2 if len(snake) > 60 else 1
         return free >= need
 
     def fallback_direction(self, world, snake, wrap_mode: bool = False, offset: int = 0):

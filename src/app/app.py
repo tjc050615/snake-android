@@ -167,7 +167,7 @@ class SnakeApp(App):
             self.cfg["bg_index"] = self.bgindex_override
         if self.viewscale_override is not None:
             self.cfg["view_zoom"] = self.viewscale_override
-        self.game = Game(DEFAULT_SEED)
+        self.game = Game(DEFAULT_SEED, obstacles=C.OBSTACLES_ENABLED)
         self.recorder = Recorder(self.game.seed, 'human')
         self.game.clock.set_speed(self.speed)
         self._foods0 = self.game.world.food_count()

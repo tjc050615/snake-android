@@ -28,9 +28,11 @@ class TickSummary:
 class Game:
     """一局游戏。reset() 之后即可复用实例。"""
 
-    def __init__(self, seed: int = 0, deterministic_food: bool = False) -> None:
+    def __init__(self, seed: int = 0, deterministic_food: bool = False,
+                 obstacles: bool = True) -> None:
         self.seed = int(seed)
         self.deterministic_food = bool(deterministic_food)
+        self.obstacles = bool(obstacles)
         # 穿墙模式（D-025）：True 时忽略障碍/墙壁，但自撞仍然死
         self.wrap_mode = False
         # 每个逻辑 tick 开始前的回调（AI 等），回调内可调用 set_direction
@@ -45,7 +47,7 @@ class Game:
     def reset(self, seed: int | None = None) -> None:
         if seed is not None:
             self.seed = int(seed)
-        self.world = World(self.seed)
+        self.world = World(self.seed, obstacles=self.obstacles)
         self.world.ensure_chunk_at(C.SPAWN_CELL)
         self.snake = Snake.spawn()
         self.clock = TickClock()

@@ -28,7 +28,8 @@ def chunk_coord(cell: tuple[int, int]) -> tuple[int, int]:
 class World:
     """无限网格世界。障碍/墙壁用全局集合索引，chunk 表只负责生成范围。"""
 
-    def __init__(self, seed: int) -> None:
+    def __init__(self, seed: int, obstacles: bool = True) -> None:
+        self.obstacles_enabled = bool(obstacles)
         self.seed = int(seed)
         self._chunks: dict[tuple[int, int], Chunk] = {}
         self._foods: set[tuple[int, int]] = set()
@@ -171,13 +172,14 @@ class World:
 
         chunk = Chunk(cx=cx, cy=cy, foods=[])
 
-        # ① + ② 障碍：先入全局索引，后续墙壁连通校验与食物过滤才能看到
-        for cell in gen.chunk_obstacle_cells(self.seed, cx, cy):
+        # ① + ② 障碍：纯空地模式下整体关闭（用户需求变更）
+        for cell in (gen.chunk_obstacle_cells(self.seed, cx, cy) if self.obstacles_enabled else []):
             chunk.obstacles.add(cell)
             self.add_blocked(cell, BLOCK_OBSTACLE)
 
         # ②b 墙壁：障碍已在索引里，连通校验把障碍与墙一起算
-        walls, degraded = gen.chunk_wall_cells(self.seed, cx, cy, set(chunk.obstacles))
+        walls, degraded = (gen.chunk_wall_cells(self.seed, cx, cy, set(chunk.obstacles))
+                                       if self.obstacles_enabled else ([], False))
         for cell in walls:
             chunk.walls.add(cell)
             self.add_blocked(cell, BLOCK_WALL)
