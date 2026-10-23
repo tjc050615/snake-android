@@ -117,7 +117,7 @@ class AISession:
         self.pending_path = list(self._next_path)
         self._next_path = []
 
-        if direction is not None and not self.controller.safe_step(
+        if direction is not None and self.controller._blocked_next(
             world, snake, direction, wrap_mode
         ):
             direction = self._reuse(world, snake, wrap_mode)

@@ -280,6 +280,14 @@ class AIController:
         nxt = self.path[0]
         return (nxt[0] - snake.head[0], nxt[1] - snake.head[1])
 
+    def _blocked_next(self, world, snake, direction, wrap_mode: bool = False) -> bool:
+        """宽松校验：只看下一格是否撞身体/墙（不再要求 2 个出口）。"""
+        head = snake.head
+        nxt = (head[0] + direction[0], head[1] + direction[1])
+        if nxt in snake.occupied and nxt != snake.tail:
+            return True
+        return not (wrap_mode or not world.is_blocked(nxt))
+
     def safe_step(self, world, snake, direction, wrap_mode: bool = False) -> bool:
         head = snake.head
         nxt = (head[0] + direction[0], head[1] + direction[1])
