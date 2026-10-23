@@ -66,7 +66,19 @@ def _parse_size(argv: list[str]) -> tuple[int, int] | None:
         return None
 
 
+def _apply_graphics_config() -> None:
+    """强制 120 帧上限（必须在导入 Kivy 窗口前）。"""
+    try:
+        from kivy.config import Config
+
+        Config.set("graphics", "maxfps", "120")
+        Config.set("graphics", "vsync", "0")  # 允许突破 VSync（设备支持时生效）
+    except Exception:
+        pass
+
+
 def main() -> int:
+    _apply_graphics_config()
     try:
         from app.app import SnakeApp  # noqa: PLC0415
     except ImportError as exc:

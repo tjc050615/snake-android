@@ -772,32 +772,20 @@ class SnakeApp(App):
             self._record_game()
 
     def _ai_tick(self, game) -> None:
-        """AI 分帧：决策在 Clock 回调里算，tick 只消费缓存方向（不阻塞渲染）。"""
+        """同步决策（方案 2）：AI 每次 tick 满血计算，延迟一帧会让 AI 变笨。"""
         if self.session is None:
             return
         if getattr(self, "_force_chunk_now", False):
             self.session.note_forced_reuse()
             return
-        if self._ai_dir is not None:
-            game.set_direction(self._ai_dir)
-            self._ai_dir = None
-            return
-        if self._ai_pending is None:
-            self._ai_pending = Clock.schedule_once(self._compute_ai, 0.0)
-        if self._ai_cached is not None:
-            game.set_direction(self._ai_cached)
-            self._ai_cached = None
-
-    def _compute_ai(self, _dt: float) -> None:
-        self._ai_pending = None
-        if self.session is None or self.game.state != "running":
-            return
         self._ai_counter += 1
         if self._ai_counter % max(1, self.ai_period) != 0:
             return
-        self._ai_cached = self.session.tick(
-            self.game.world, self.game.snake, self.game.wrap_mode, speed=self.speed
+        direction = self.session.tick(
+            game.world, game.snake, game.wrap_mode, speed=self.speed
         )
+        if direction is not None:
+            game.set_direction(direction)
 
     def _update_chunks(self) -> None:
         vp = self.canvas_widget.viewport

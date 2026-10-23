@@ -52,6 +52,26 @@ def reroll_foods(world, snake, rng: random.Random) -> None:
         world.add_food(cell)
 
 
+def ensure_local_food(world, snake, rng: random.Random, radius: int = 25):
+    """保证蛇头附近有食物：AI 搜索半径内看不到食物时补一个（Bug 3）。
+
+    只放在已加载、可通行、非蛇身的格子上；返回新食物坐标或 None。
+    """
+    hx, hy = snake.head
+    for cell in world.foods():
+        if abs(cell[0] - hx) <= radius and abs(cell[1] - hy) <= radius:
+            return None
+    cells = [
+        c for c in free_cells(world, snake, limit=8192)
+        if abs(c[0] - hx) <= radius and abs(c[1] - hy) <= radius
+    ]
+    if not cells:
+        return None
+    cell = rng.choice(cells)
+    world.add_food(cell)
+    return cell
+
+
 def ensure_food(world, snake, rng: random.Random) -> tuple[int, int] | None:
     """场上无食物时立刻补一个；返回新食物坐标。"""
     if world.food_count() > 0:
