@@ -44,7 +44,8 @@ def test_include_only_needed_exts():
         assert bad not in exts.split(",")
 
 
-def test_home_dir_android_uses_user_data_dir():
+def test_home_dir_android_uses_user_data_dir(monkeypatch):
+    monkeypatch.delenv("SNAKE_HOME", raising=False)
     from data.storage import home_dir
 
     assert home_dir(platform_name="android", user_data_dir="/data/user/0/org.example.snake/files") == \
