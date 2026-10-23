@@ -71,6 +71,7 @@ class AISession:
     def tick(self, world, snake, wrap_mode: bool = False, speed: float = 1.0,
              budget_s: float | None = None) -> tuple[int, int] | None:
         self.ticks += 1
+        prev_len = len(snake)
         high = speed >= HIGH_SPEED
         self.period = 2 if high else 1
         # 留 1ms 余量给 Python 调度抖动，保证总耗时 p99 < 8ms
@@ -119,6 +120,8 @@ class AISession:
         if direction is not None:
             self.last_direction = direction
 
+        if len(snake) > prev_len:
+            self.stats["eaten"] += len(snake) - prev_len
         self.stats["alive_ticks"] = self.ticks
         if self.ticks % self.stats_log_every == 0:
             self._log_stats()
@@ -138,9 +141,9 @@ class AISession:
         t0 = __import__("time").perf_counter()
         # 动态搜索深度：短蛇贪心、长蛇深搜
         if len(snake) < 30:
-            self.controller.max_nodes = getattr(self, "max_nodes_small", 300)
+            self.controller.max_nodes = getattr(self, "max_nodes_small", 400)
         else:
-            self.controller.max_nodes = getattr(self, "max_nodes_large", 400)
+            self.controller.max_nodes = getattr(self, "max_nodes_large", 800)
         deadline = None if self.deterministic else t0 + self.timeout_s
         self.controller.plan(world, snake, wrap_mode, deadline=deadline)
         cost_ms = (__import__("time").perf_counter() - t0) * 1000.0

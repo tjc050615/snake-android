@@ -90,6 +90,8 @@ class GameCanvas(Widget):
 
     # ---------- 计算 ----------
     def _apply_metrics(self) -> None:
+        if self.width < 300 or self.height < 300:
+            return   # 初始布局阶段：等真实尺寸再建相机，避免 100x100 警告
         density = desktop.get_density()
         try:
             self.grid_size = fit_grid_size(density / self.view_zoom, self.width, self.height)
