@@ -55,6 +55,7 @@ from data.achievements import evaluate
 from view.confirm_dialog import ConfirmDialog
 from view.debug_overlay import DebugOverlay
 from view.fps_label import FpsLabel
+from view.score_label import ScoreLabel
 from view.menu import MenuButton, Scrim
 from view.replay_panel import ReplayPanel
 from view.stats_panel import StatsPanel
@@ -231,7 +232,9 @@ class SnakeApp(App):
         self.root_layout = root
         self.debug_overlay = DebugOverlay(pos_hint={'x': 0.30, 'top': 0.98})
         self.fps_label = FpsLabel(pos=(10, 10))
+        self.score_label = ScoreLabel(pos=(10, 42))
         root.add_widget(self.fps_label)
+        root.add_widget(self.score_label)
         self.canvas_widget.set_background(self.cfg.get('bg_mode', 'solid'), self.cfg.get('bg_index', 0))
         self.canvas_widget.set_view_scale(float(self.cfg.get('view_zoom', 1.0)))
         root.add_widget(self.debug_overlay)
@@ -765,6 +768,7 @@ class SnakeApp(App):
             self._time_since_chunk = 0.0
             self._update_chunks()
         if summary.ticks or summary.died:
+            self.score_label.update_score(self.game.score, len(self.game.snake))
             self.recorder.tick(self.game.snake.direction)
             self.panel.refresh()
         if self.debug_stats.enabled:

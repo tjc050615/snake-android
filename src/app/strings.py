@@ -7,6 +7,7 @@ DEFAULT_LANG = "zh"
 ZH = {
     "game_over": "游戏结束",
     "score": "得分",
+    "length": "长度",
     "restart_hint": "按 R 重新开始",
     "paused": "已暂停",
     "restart_confirm": "确定要重新开始吗？",
@@ -88,6 +89,7 @@ ZH = {
 EN = {
     "game_over": "GAME OVER",
     "score": "Score",
+    "length": "Length",
     "restart_hint": "Press R to restart",
     "paused": "Paused",
     "restart_confirm": "Restart this run?",

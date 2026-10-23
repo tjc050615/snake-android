@@ -63,6 +63,8 @@ def ensure_local_food(world, snake, rng: random.Random, radius: int = 10):
         return sum(1 for c in world.foods()
                    if abs(c[0] - hx) <= r and abs(c[1] - hy) <= r)
 
+    if world.food_count() >= 5:
+        return None
     if near_count(radius) >= 2:
         return None
 

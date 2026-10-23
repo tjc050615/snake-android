@@ -52,6 +52,10 @@ class GameCanvas(Widget):
         self.bg_index = 0
         self.snake_hue = 0.33
         self.view_zoom = 1.0
+        from kivy.graphics import InstructionGroup
+        self._static = InstructionGroup()
+        self.canvas.before.add(self._static)
+        self._static_dirty = True
         self._cells_buf: list = []                 # R5A：蛇身插值缓冲复用
         self.colors = palette("dark")
         self.show_grid = True
@@ -181,30 +185,43 @@ class GameCanvas(Widget):
         self._status_text = ""
 
     # ---------- 绘制 ----------
+    def _rebuild_static(self) -> None:
+        """背景层缓存：只在 resize / 主题 / 背景变化时重建（不再每帧重画）。"""
+        from core.colors import background_color, gradient_pair
+        from kivy.graphics import Color, Rectangle
+
+        self._static.clear()
+        if self.bg_mode == "gradient":
+            top, bottom = gradient_pair(self.bg_index)
+            bands = 40
+            for i in range(bands):
+                t = i / (bands - 1)
+                self._static.add(Color(
+                    top[0] + (bottom[0] - top[0]) * t,
+                    top[1] + (bottom[1] - top[1]) * t,
+                    top[2] + (bottom[2] - top[2]) * t, 1,
+                ))
+                self._static.add(Rectangle(
+                    pos=(self.x, self.y + self.height * (bands - 1 - i) / bands),
+                    size=(self.width, self.height / bands + 1),
+                ))
+        else:
+            r, g, b = background_color(self.bg_index)
+            self._static.add(Color(r, g, b, 1))
+            self._static.add(Rectangle(pos=self.pos, size=self.size))
+        self._static_dirty = False
+
     def rebuild(self) -> None:
         self.canvas.clear()
         vp = self.viewport
         if vp is None:
             return
 
+        if self._static_dirty:
+            self._rebuild_static()
+
         g = vp.grid_size
         with self.canvas:
-            if self.bg_mode == "gradient":
-                # 方案 B：40 条等高长条逐条 RGB 插值（避免纹理拉伸出的横线）
-                top, bottom = gradient_pair(self.bg_index)
-                bands = 40
-                for i in range(bands):
-                    t = i / (bands - 1)
-                    Color(top[0] + (bottom[0] - top[0]) * t,
-                          top[1] + (bottom[1] - top[1]) * t,
-                          top[2] + (bottom[2] - top[2]) * t, 1)
-                    Rectangle(pos=(self.x, self.y + self.height * (bands - 1 - i) / bands),
-                              size=(self.width, self.height / bands + 1))
-            else:
-                br, bgc, bb = background_color(self.bg_index)
-                Color(br, bgc, bb, 1)
-                Rectangle(pos=self.pos, size=self.size)
-
             if self.show_grid:
                 # 单张 16x16 平铺纹理：整屏网格 1 个 draw call（不再逐条 Line）
                 Color(*self.colors["grid"])
@@ -366,10 +383,12 @@ class GameCanvas(Widget):
         """背景选择：solid / gradient，index 0~15（实时重建）。"""
         self.bg_mode = "gradient" if mode == "gradient" else "solid"
         self.bg_index = int(index) % 16
+        self._static_dirty = True
         self.rebuild()
 
     def set_theme(self, name: str) -> None:
         self.colors = palette(name)
+        self._static_dirty = True
         self.rebuild()
 
     def apply_view_options(self, show_grid: bool, head_highlight: bool) -> None:

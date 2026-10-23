@@ -77,16 +77,21 @@ class AISession:
         self.timeout_s = budget_s if budget_s is not None else (0.0035 if high else 0.0070)
         self.controller.radius_cap = 40 if high else 80
 
-        # FOLLOW_TAIL 省钱模式：视野内没有食物时，沿用安全方向，不跑 A*/洪泛
-        near_food = any(abs(c[0] - snake.head[0]) <= 10 and abs(c[1] - snake.head[1]) <= 10
+        # FOLLOW_TAIL 省钱模式：仅当「附近确实没食物」且连续使用不超过 12 tick
+        near_food = any(abs(c[0] - snake.head[0]) <= 30 and abs(c[1] - snake.head[1]) <= 30
                         for c in world.foods())
-        if (not near_food and self.controller.state == "FOLLOW_TAIL"
+        cheap_ok = (not near_food and world.food_count() == 0) or (
+            not near_food and getattr(self, "_cheap_ticks", 0) < 12
+        )
+        if (cheap_ok and self.controller.state == "FOLLOW_TAIL"
                 and self.last_direction is not None
                 and self.controller.safe_step(world, snake, self.last_direction, wrap_mode)):
+            self._cheap_ticks = getattr(self, "_cheap_ticks", 0) + 1
             self._follow_cheap = True
             self.stats["follow_cheap"] = self.stats.get("follow_cheap", 0) + 1
             self.stats["alive_ticks"] = self.ticks
             return self.last_direction
+        self._cheap_ticks = 0
         self._follow_cheap = False
 
         # 高速档：每 2 tick 决策一次；其余每 tick
