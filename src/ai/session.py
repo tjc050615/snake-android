@@ -76,6 +76,7 @@ class AISession:
         elif len(snake) > self._last_len:
             self.stats["eaten"] += len(snake) - self._last_len
         self._last_len = len(snake)
+        self._plan: list[tuple[int, int]] = getattr(self, "_plan", [])
         self._stall = getattr(self, "_stall", 0)
         self._last_target = getattr(self, "_last_target", None)
         self._last_dist = getattr(self, "_last_dist", None)
@@ -102,6 +103,20 @@ class AISession:
             return self.last_direction
         self._cheap_ticks = 0
         self._follow_cheap = False
+
+        # 路径复用：上一条路径仍可走就继续走，不重算
+        reuse_dir = None
+        while self._plan and self._plan[0] == snake.head:
+            self._plan.pop(0)
+        if self._plan:
+            step = self._plan[0]
+            d = (step[0] - snake.head[0], step[1] - snake.head[1])
+            if (abs(d[0]) + abs(d[1]) == 1
+                    and world.has_food(self._plan[-1])
+                    and self.controller.safe_step(world, snake, d, wrap_mode)):
+                reuse_dir = d
+                self._plan.pop(0)
+                self.stats["path_reuse"] = self.stats.get("path_reuse", 0) + 1
 
         # 高速档：每 2 tick 决策一次；其余每 tick
         if self.ticks % self.period == 0:
@@ -175,6 +190,7 @@ class AISession:
         direction = self.controller.next_direction(snake)
         if direction is not None and self.controller.safe_step(world, snake, direction, wrap_mode):
             self._next_pending = direction
+        self._plan = list(self.controller.path)
         self._next_path = list(self.controller.path)
         self.path = list(self.controller.path)
         self.path_tick = self.ticks
