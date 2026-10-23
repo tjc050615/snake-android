@@ -19,8 +19,12 @@ HIGH_SPEED = 5.0
 
 
 class AISession:
-    def __init__(self, tick_hz: int = 10, stats_log_hz: float = 2.0) -> None:
+    def __init__(self, tick_hz: int = 10, stats_log_hz: float = 2.0,
+                 deterministic: bool = False) -> None:
+        self.deterministic = bool(deterministic)
         self.controller = AIController()
+        if self.deterministic:
+            self.controller.max_nodes = 1500
         self.tick_hz = tick_hz
         self.stats_log_every = max(1, int(round(tick_hz / stats_log_hz)))
         self.reset()
@@ -114,7 +118,8 @@ class AISession:
 
     def _compute(self, world, snake, wrap_mode: bool) -> None:
         t0 = __import__("time").perf_counter()
-        self.controller.plan(world, snake, wrap_mode, deadline=t0 + self.timeout_s)
+        deadline = None if self.deterministic else t0 + self.timeout_s
+        self.controller.plan(world, snake, wrap_mode, deadline=deadline)
         cost_ms = (__import__("time").perf_counter() - t0) * 1000.0
 
         direction = self.controller.next_direction(snake)

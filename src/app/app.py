@@ -46,6 +46,7 @@ from core.audio import Haptics, SoundManager
 from core.confirm import ConfirmState
 from core.frame_budget import chunk_slot, forced_chunk_frame
 from core.input_queue import InputQueue
+from core.player_safety import blocks_move
 from core.replay import Recorder
 from core.replay_player import ReplayDriver
 from core.replay_controls import ReplayControls
@@ -194,6 +195,7 @@ class SnakeApp(App):
             on_achievements=self._open_achievements,
             on_stats=self._open_stats,
             on_ai=self._toggle_ai,
+            on_tap=self._ui_tap,
             on_speed=self._cycle_speed,
         )
         self.panel.size_hint = (0.34, 1.0)
@@ -451,6 +453,9 @@ class SnakeApp(App):
         self.ai_period = 1 if mode == "performance" else (2 if mode == "battery" else 1)
         self._ai_counter = 0
 
+    def _ui_tap(self) -> None:
+        self.haptics.vibrate_ms(20)
+
     def _toggle_menu(self) -> None:
         if getattr(self, "menu_open", False):
             self._close_menu()
@@ -686,8 +691,7 @@ class SnakeApp(App):
                  'games_today': self.profile.get('total_games', 0)}
         self.profile, newly = evaluate(self.profile, stats)
         for _key in newly:
-            self.sound.play("achievement")
-            self.haptics.vibrate("achievement")
+            self.haptics.vibrate_ms(300)
         try:
             self.profile_store.save(self.profile)
         except Exception as exc:  # pragma: no cover
@@ -700,6 +704,9 @@ class SnakeApp(App):
 
     def _on_direction(self, direction) -> None:
         if self.replay_mode or self.confirm_state.active:
+            return
+        # 玩家侧防死胡同：这一步会让空间不足就拦截
+        if blocks_move(self.game.world, self.game.snake, direction, self.game.wrap_mode):
             return
         self.input_queue.push(direction, self.game.snake.direction)
 
@@ -763,11 +770,9 @@ class SnakeApp(App):
         else:
             self.debug_overlay.text = ""
         if summary.ate:
-            self.sound.play("eat")
-            self.haptics.vibrate("eat")
+            self.haptics.vibrate_ms(50)
         if summary.died:
-            self.sound.play("die")
-            self.haptics.vibrate("die")
+            self.haptics.vibrate_ms(300)
         if self.session is not None:
             self.canvas_widget.ai_path = self.session.current_path(self.game.ticks)
         if (

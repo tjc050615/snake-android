@@ -54,6 +54,12 @@ class Haptics:
         self.strength = max(0.0, min(1.0, strength))
         self.calls: list[str] = []
 
+    def vibrate_ms(self, ms: int) -> bool:
+        if not self.enabled:
+            return False
+        self.calls.append(f"{int(ms)}ms")
+        return True
+
     def vibrate(self, name: str) -> bool:
         if not self.enabled:
             return False

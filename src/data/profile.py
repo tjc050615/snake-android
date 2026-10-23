@@ -14,6 +14,8 @@ HISTORY_SIZE = 20
 DEFAULTS: dict = {
     "version": PROFILE_VERSION,
     "best_score": 0,
+    "best_score_human": 0,
+    "best_score_ai": 0,
     "total_games": 0,
     "achievements": {},
     "onboarding_done": False,
@@ -41,6 +43,8 @@ def validate_profile(raw) -> dict:
 
     try:
         prof["best_score"] = max(0, int(raw.get("best_score", 0)))
+        prof["best_score_human"] = max(0, int(raw.get("best_score_human", 0)))
+        prof["best_score_ai"] = max(0, int(raw.get("best_score_ai", 0)))
         prof["total_games"] = max(0, int(raw.get("total_games", 0)))
     except (TypeError, ValueError):
         pass
@@ -89,7 +93,10 @@ class ProfileStore:
         prof["history"] = (prof["history"] + [entry])[-HISTORY_SIZE:]
         prof["total_games"] += 1
         try:
-            prof["best_score"] = max(prof["best_score"], int(entry["score"] or 0))
+            score = int(entry["score"] or 0)
+            prof["best_score"] = max(prof["best_score"], score)
+            key = "best_score_ai" if entry.get("is_ai") else "best_score_human"
+            prof[key] = max(prof[key], score)
         except (TypeError, ValueError):
             pass
         return prof

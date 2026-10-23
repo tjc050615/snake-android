@@ -129,10 +129,9 @@ def test_replay_blocks_keyboard_joystick_swipe():
 # ---------- 音效/震动事件 ----------
 def test_sound_haptics_triggered_on_events(tmp_path):
     app_src = _read("app/app.py")
-    for event in ('sound.play("eat")', 'sound.play("die")', 'sound.play("achievement")'):
-        assert event in app_src, f"缺事件触发：{event}"
-    for event in ('haptics.vibrate("eat")', 'haptics.vibrate("die")', 'haptics.vibrate("achievement")'):
-        assert event in app_src, f"缺震动触发：{event}"
+    for ms in ("vibrate_ms(50)", "vibrate_ms(300)", "vibrate_ms(20)"):
+        assert ms in app_src, f"缺震动：{ms}"
+    assert "sound.play" not in app_src, "音效逻辑应已移除（只保留震动）"
 
     sm = SoundManager(str(tmp_path))
     assert sm.play("eat") is False  # 缺文件静默

@@ -93,6 +93,12 @@ class Panel(ThemedMixin, BoxLayout):
         self.btn_wrap.text = strings.t("wrap_on" if self.game.wrap_mode else "wrap_off")
         self.btn_history.text = strings.t("history")
         self.btn_ach.text = strings.t("achievements")
+        try:
+            self.lbl_score.text = (f"{strings.t('score')} {self.game.score}\n"
+                                   f"{strings.t('best')} {getattr(self, 'best_human', 0)}"
+                                   f"/{getattr(self, 'best_ai', 0)}")
+        except Exception:
+            pass
         self.btn_stats.text = strings.t("ai_stats")
         self.btn_ai.text = strings.t("ai_off") if getattr(self, "ai_active", False) else strings.t("ai_on")
         self.btn_speed.text = f"{getattr(self, 'speed', 1.0):g}x"
