@@ -284,15 +284,15 @@ class GameCanvas(Widget):
             head_lum = 0.299 * grad[0][0] + 0.587 * grad[0][1] + 0.114 * grad[0][2]
             low_contrast = abs(head_lum - bg_lum) < 0.22
 
-            for idx in range(1, len(cells)):
-                Color(grad[idx][0], grad[idx][1], grad[idx][2], 1)
-                cell = cells[idx]
+            # 整条蛇 = 1 条折线（round cap/joint）+ 1 个圆头
+            points: list[float] = []
+            for cell in cells:
                 px, py = to_pixel(cell, g, vp.origin_x, vp.origin_y)
-                if -g <= px <= self.width + g and -g <= py <= self.height + g:
-                    Ellipse(
-                        pos=(px - g / 2 + pad_snake, py - g / 2 + pad_snake),
-                        size=(g - 2 * pad_snake, g - 2 * pad_snake),
-                    )
+                points.extend((px, py))
+            if len(points) >= 4:
+                mid = grad[len(grad) // 2]
+                Color(mid[0], mid[1], mid[2], 1)
+                Line(points=points, width=g * 0.60, cap="round", joint="round")
 
             Color(grad[0][0], grad[0][1], grad[0][2], 1)
             hx, hy = to_pixel(cells[0], g, vp.origin_x, vp.origin_y)

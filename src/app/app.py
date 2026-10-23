@@ -1019,7 +1019,7 @@ class SnakeApp(App):
         print("[SMOKE] snake         =", f"len={len(self.game.snake)} head={self.game.snake.head} dir={self.game.snake.direction}")
         print("[SMOKE] state/ticks   =", self.game.state, "ticks=", self.game.ticks)
         print("[SMOKE] camera        =", f"cur={m.get('cam_current')} tgt={m.get('cam_target')} armed={m.get('cam_armed')}")
-        print("[SMOKE] head_screen   =", f"{tuple(round(v, 1) for v in m.get('head_screen'))} inside={m.get('head_inside')}")
+        print("[SMOKE] head_screen   =", f"{tuple(round(v, 1) for v in (m.get('head_screen') or (0, 0)))} inside={m.get('head_inside')}")
         print("[SMOKE] seed          =", self.game.seed)
         print("[SMOKE] exit scheduled=", self.smoke_seconds, "s")
 
@@ -1032,7 +1032,7 @@ class SnakeApp(App):
         print("[SMOKE] eaten(foods)  =", f"{self._foods0} -> {self.game.world.food_count()}, eaten={self.game.score}")
         print("[SMOKE] snake         =", f"len={len(self.game.snake)} head={self.game.snake.head}")
         print("[SMOKE] camera        =", f"cur={m.get('cam_current')} tgt={m.get('cam_target')} armed={m.get('cam_armed')}")
-        print("[SMOKE] head_screen   =", f"{tuple(round(v, 1) for v in m.get('head_screen'))} inside={m.get('head_inside')}")
+        print("[SMOKE] head_screen   =", f"{tuple(round(v, 1) for v in (m.get('head_screen') or (0, 0)))} inside={m.get('head_inside')}")
         print("[SMOKE] progress      =", f"{m.get('progress'):.3f}")
         print("[SMOKE] chunks_loaded =", len(self.game.world.loaded_chunks()))
         try:

@@ -102,7 +102,7 @@ class AIController:
         # R5C 紧急保底：剩余空间 < 蛇长时，立刻改走「最大连通空间」方向
         if self.stats["plans"] % 1 == 0:
             area = self._flood_area(world, snake, head, wrap_mode,
-                                    limit=min(len(snake) + 60, 150))  # 必须足够大，否则长蛇永远误判空间不足
+                                    limit=140)  # 必须足够大，否则长蛇永远误判空间不足
             margin = self.margin_small if len(snake) < 50 else self.margin_large
             if len(snake) >= 20 and area < len(snake) + margin:
                 path = self._space_best_step(world, snake, wrap_mode, rect, deadline=deadline)
