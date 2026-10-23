@@ -102,6 +102,13 @@ def main() -> int:
     app.menu_shot = "--menu" in sys.argv
     app.joystick_shot = "--jstick" in sys.argv
     for _arg in sys.argv:
+        if _arg.startswith("--bgmode="):
+            app.bgmode_override = _arg.split("=", 1)[1]
+        elif _arg.startswith("--viewscale="):
+            app.viewscale_override = float(_arg.split("=", 1)[1])
+        elif _arg.startswith("--bgindex="):
+            app.bgindex_override = int(_arg.split("=", 1)[1])
+    for _arg in sys.argv:
         if _arg.startswith("--theme="):
             app.theme_override = _arg.split("=", 1)[1]
         elif _arg.startswith("--font="):

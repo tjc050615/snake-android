@@ -15,7 +15,7 @@ from kivy.uix.widget import Widget
 from app import constants as C
 from app import strings
 from app.theme import palette
-from core.colors import background_color, snake_gradient
+from core.colors import background_color, gradient_pair, snake_gradient
 from view.gradient_bg import gradient_texture
 from app.fonts import font_name
 from core.camera import Camera
@@ -189,13 +189,19 @@ class GameCanvas(Widget):
         g = vp.grid_size
         with self.canvas:
             if self.bg_mode == "gradient":
-                # 单张 256 行渐变纹理铺满：平滑无断层
-                Color(1, 1, 1, 1)
-                Rectangle(texture=gradient_texture(self.bg_index),
-                          pos=self.pos, size=self.size)
+                # 方案 B：40 条等高长条逐条 RGB 插值（避免纹理拉伸出的横线）
+                top, bottom = gradient_pair(self.bg_index)
+                bands = 40
+                for i in range(bands):
+                    t = i / (bands - 1)
+                    Color(top[0] + (bottom[0] - top[0]) * t,
+                          top[1] + (bottom[1] - top[1]) * t,
+                          top[2] + (bottom[2] - top[2]) * t, 1)
+                    Rectangle(pos=(self.x, self.y + self.height * (bands - 1 - i) / bands),
+                              size=(self.width, self.height / bands + 1))
             else:
-                r, g, bl = background_color(self.bg_index)
-                Color(r, g, bl, 1)
+                br, bgc, bb = background_color(self.bg_index)
+                Color(br, bgc, bb, 1)
                 Rectangle(pos=self.pos, size=self.size)
 
             Color(*self.colors["grid"])
@@ -252,6 +258,16 @@ class GameCanvas(Widget):
             pad_snake = 1.0
 
             grad = snake_gradient(len(cells), self.snake_hue)
+            # 对比度检查：蛇头颜色与背景亮度差 < 0.22 时，逐节加白色描边
+            if self.bg_mode == "gradient":
+                a, b = gradient_pair(self.bg_index)
+                bg_rgb = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2)
+            else:
+                bg_rgb = background_color(self.bg_index)
+            bg_lum = 0.299 * bg_rgb[0] + 0.587 * bg_rgb[1] + 0.114 * bg_rgb[2]
+            head_lum = 0.299 * grad[0][0] + 0.587 * grad[0][1] + 0.114 * grad[0][2]
+            low_contrast = abs(head_lum - bg_lum) < 0.22
+
             for idx in range(1, len(cells)):
                 Color(grad[idx][0], grad[idx][1], grad[idx][2], 1)
                 cell = cells[idx]
@@ -268,10 +284,17 @@ class GameCanvas(Widget):
                 pos=(hx - g / 2 + pad_snake, hy - g / 2 + pad_snake),
                 size=(g - 2 * pad_snake, g - 2 * pad_snake),
             )
-            if self.head_highlight:
-                # 可访问性：蛇头外圈高亮描边
-                Color(1.0, 1.0, 1.0, 0.85)
+            if self.head_highlight or low_contrast:
+                # 可访问性 / 低对比度兜底：蛇头外圈白色描边
+                Color(1.0, 1.0, 1.0, 0.9)
                 Line(rectangle=(hx - g / 2 + 1, hy - g / 2 + 1, g - 2, g - 2), width=2)
+
+            if low_contrast:
+                # 纯色/渐变与蛇身颜色接近时，逐节描白边，确保绝对可见
+                Color(1.0, 1.0, 1.0, 0.75)
+                for idx in range(1, len(cells)):
+                    px, py = to_pixel(cells[idx], g, vp.origin_x, vp.origin_y)
+                    Line(rectangle=(px - g / 2 + 1, py - g / 2 + 1, g - 2, g - 2), width=1)
 
             if self.game.state == "dead":
                 Color(*self.colors["dead_tint"])
@@ -333,8 +356,10 @@ class GameCanvas(Widget):
             self.rebuild()
 
     def set_view_scale(self, scale: float) -> None:
-        """视野大小：scale 越大格子越小、可见范围越大（0.6~2.0）。"""
+        """视野大小：重算 grid_size / camera / viewport 后重建（否则滑块无效）。"""
         self.view_scale = max(0.6, min(2.0, float(scale)))
+        if self.width > 0 and self.height > 0:
+            self._apply_metrics()
         self.rebuild()
 
     def set_background(self, mode: str, index: int) -> None:

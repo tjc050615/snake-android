@@ -105,6 +105,9 @@ class SnakeApp(App):
     confirm_shot = False
     replaypause_shot = False
     bg_demo = False
+    bgmode_override: str | None = None
+    bgindex_override: int | None = None
+    viewscale_override: float | None = None
     menu_shot = False
     joystick_shot = False
     theme_override: str | None = None
@@ -153,6 +156,12 @@ class SnakeApp(App):
         if self.bg_demo:
             self.cfg["bg_mode"] = "gradient"
             self.cfg["bg_index"] = 3
+        if self.bgmode_override:
+            self.cfg["bg_mode"] = self.bgmode_override
+        if self.bgindex_override is not None:
+            self.cfg["bg_index"] = self.bgindex_override
+        if self.viewscale_override is not None:
+            self.cfg["view_scale"] = self.viewscale_override
         self.game = Game(DEFAULT_SEED)
         self.recorder = Recorder(self.game.seed, 'human')
         self.game.clock.set_speed(self.speed)
