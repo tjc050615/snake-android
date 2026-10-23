@@ -28,7 +28,8 @@ DEFAULTS: dict = {
     "font_size": 16.0,
     "bg_mode": "solid",   # solid | gradient
     "bg_index": 0,
-    "view_scale": 1.0,
+    "view_zoom": 1.0,    # 1x 近景 / 1.5x / 2x / 2.5x / 4x 广角
+    "fps_cap": 60,
 }
 
 THEMES = ("dark", "light", "high_contrast")
@@ -76,7 +77,9 @@ def validate(raw: dict) -> dict:
     cfg["theme"] = theme if theme in THEMES else "dark"
     cfg["bg_mode"] = raw.get("bg_mode") if raw.get("bg_mode") in ("solid", "gradient") else "solid"
     cfg["bg_index"] = int(raw.get("bg_index", 0)) % 16
-    cfg["view_scale"] = _clamp(raw.get("view_scale", cfg["view_scale"]), 0.6, 2.0, cfg["view_scale"])
+    cfg["view_zoom"] = _clamp(raw.get("view_zoom", raw.get("view_scale", 1.0)), 1.0, 4.0, 1.0)
+    fps_cap = raw.get("fps_cap", 60)
+    cfg["fps_cap"] = fps_cap if fps_cap in (60, 90, 120) else 60
     mode = raw.get("perf_mode", cfg["perf_mode"])
     cfg["perf_mode"] = mode if mode in PERF_MODES else "balanced"
     return cfg

@@ -50,7 +50,7 @@ class GameCanvas(Widget):
         self.bg_mode = "solid"
         self.bg_index = 0
         self.snake_hue = 0.33
-        self.view_scale = 1.0
+        self.view_zoom = 1.0
         self._cells_buf: list = []                 # R5A：蛇身插值缓冲复用
         self.colors = palette("dark")
         self.show_grid = True
@@ -86,7 +86,7 @@ class GameCanvas(Widget):
     def _apply_metrics(self) -> None:
         density = desktop.get_density()
         try:
-            self.grid_size = fit_grid_size(density * self.view_scale, self.width, self.height)
+            self.grid_size = fit_grid_size(density / self.view_zoom, self.width, self.height)
             self.too_small = False
         except ValueError as exc:
             self.grid_size = C.GRID_SIZE_MIN
@@ -350,17 +350,21 @@ class GameCanvas(Widget):
         old = vp.grid_size
         from platform_layer import desktop
 
-        new = fit_grid_size(desktop.get_density() * self.view_scale, self.width, self.height)
+        new = fit_grid_size(desktop.get_density() / self.view_zoom, self.width, self.height)
         if new != old:
             rescale_for_grid(cam, old, new)
             self.rebuild()
 
-    def set_view_scale(self, scale: float) -> None:
-        """视野大小：重算 grid_size / camera / viewport 后重建（否则滑块无效）。"""
-        self.view_scale = max(0.6, min(2.0, float(scale)))
+    def set_view_zoom(self, zoom: float) -> None:
+        """广角镜头：zoom 越大格子越小、可见范围越大（1x~4x）。"""
+        self.view_zoom = max(1.0, min(4.0, float(zoom)))
         if self.width > 0 and self.height > 0:
             self._apply_metrics()
         self.rebuild()
+
+    # 兼容旧调用
+    def set_view_scale(self, scale: float) -> None:
+        self.set_view_zoom(scale)
 
     def set_background(self, mode: str, index: int) -> None:
         """背景选择：solid / gradient，index 0~15（实时重建）。"""

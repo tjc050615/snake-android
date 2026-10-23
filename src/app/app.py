@@ -144,6 +144,11 @@ class SnakeApp(App):
         self.recorder = None  # game 创建后再初始化
         self.replay_driver = None
         self._time_since_chunk = 0.0
+        self._ai_dir = None
+        self._ai_cached = None
+        self._ai_pending = None
+        self._ai_counter = 0
+        self.ai_period = 1
         self._force_chunk_now = False
         self._recorded = False
         self.pause_gate = PauseGate()
@@ -161,7 +166,7 @@ class SnakeApp(App):
         if self.bgindex_override is not None:
             self.cfg["bg_index"] = self.bgindex_override
         if self.viewscale_override is not None:
-            self.cfg["view_scale"] = self.viewscale_override
+            self.cfg["view_zoom"] = self.viewscale_override
         self.game = Game(DEFAULT_SEED)
         self.recorder = Recorder(self.game.seed, 'human')
         self.game.clock.set_speed(self.speed)
@@ -198,7 +203,8 @@ class SnakeApp(App):
 
         self.canvas_widget.set_theme(self.cfg.get("theme", "dark"))
         self.canvas_widget.set_background(self.cfg.get("bg_mode", "solid"), self.cfg.get("bg_index", 0))
-        self.canvas_widget.set_view_scale(float(self.cfg.get("view_scale", 1.0)))
+        self.canvas_widget.set_view_zoom(float(self.cfg.get("view_zoom", 1.0)))
+        self._apply_perf()
         self.canvas_widget.apply_view_options(
             self.cfg.get("show_grid", True), self.cfg.get("head_highlight", True)
         )
@@ -221,7 +227,7 @@ class SnakeApp(App):
         self.fps_label = FpsLabel(pos=(10, 10))
         root.add_widget(self.fps_label)
         self.canvas_widget.set_background(self.cfg.get('bg_mode', 'solid'), self.cfg.get('bg_index', 0))
-        self.canvas_widget.set_view_scale(float(self.cfg.get('view_scale', 1.0)))
+        self.canvas_widget.set_view_scale(float(self.cfg.get('view_zoom', 1.0)))
         root.add_widget(self.debug_overlay)
         self._apply_theme()
         # 布局完成后再刷一次文案：面板首次创建时宽度为 0，纹理会按 0 宽缓存
@@ -350,7 +356,7 @@ class SnakeApp(App):
         self._save_event = Clock.schedule_once(self._flush_save, 0.5)
         self.canvas_widget.set_theme(self.cfg.get("theme", "dark"))
         self.canvas_widget.set_background(self.cfg.get("bg_mode", "solid"), self.cfg.get("bg_index", 0))
-        self.canvas_widget.set_view_scale(float(self.cfg.get("view_scale", 1.0)))
+        self.canvas_widget.set_view_zoom(float(self.cfg.get("view_zoom", 1.0)))
         self.canvas_widget.apply_view_options(
             self.cfg.get("show_grid", True), self.cfg.get("head_highlight", True)
         )
@@ -420,6 +426,20 @@ class SnakeApp(App):
         except Exception:
             pass
 
+    def _apply_perf(self) -> None:
+        """帧率上限 + 性能模式联动（高性能 120 / 省电 60，AI 频率相应变化）。"""
+        mode = self.cfg.get("perf_mode", "balanced")
+        cap = 120 if mode == "performance" else (60 if mode == "battery" else int(self.cfg.get("fps_cap", 60)))
+        try:
+            from kivy.core.window import Window
+
+            if hasattr(Window, "max_fps"):
+                Window.max_fps = cap
+        except Exception:
+            pass
+        self.ai_period = 1 if mode == "performance" else (2 if mode == "battery" else 1)
+        self._ai_counter = 0
+
     def _toggle_menu(self) -> None:
         if getattr(self, "menu_open", False):
             self._close_menu()
@@ -450,7 +470,7 @@ class SnakeApp(App):
         self.canvas_widget.ai_path = []
 
     def _cycle_speed(self) -> None:
-        speeds = (1.0, 2.0, 4.0)
+        speeds = (1.0, 2.0, 4.0, 8.0, 16.0)
         try:
             idx = speeds.index(round(self.speed, 1))
         except ValueError:
@@ -473,7 +493,7 @@ class SnakeApp(App):
         colors = palette(self.cfg.get("theme", "dark"))
         self.canvas_widget.set_theme(self.cfg.get("theme", "dark"))
         self.canvas_widget.set_background(self.cfg.get("bg_mode", "solid"), self.cfg.get("bg_index", 0))
-        self.canvas_widget.set_view_scale(float(self.cfg.get("view_scale", 1.0)))
+        self.canvas_widget.set_view_zoom(float(self.cfg.get("view_zoom", 1.0)))
         self.panel.apply_theme(colors)
         for name in ("settings_overlay", "history_overlay", "achievements_overlay",
                      "stats_overlay", "replay_overlay", "confirm_overlay"):
@@ -752,15 +772,32 @@ class SnakeApp(App):
             self._record_game()
 
     def _ai_tick(self, game) -> None:
-        """每个逻辑 tick 开始前调用：AI 方向写入 game（下一 tick 生效）。"""
+        """AI 分帧：决策在 Clock 回调里算，tick 只消费缓存方向（不阻塞渲染）。"""
         if self.session is None:
             return
         if getattr(self, "_force_chunk_now", False):
-            self.session.note_forced_reuse()  # 强制 chunk 帧：跳过 AI，记一次沿用
+            self.session.note_forced_reuse()
             return
-        d = self.session.tick(game.world, game.snake, game.wrap_mode, speed=self.speed)
-        if d is not None:
-            game.set_direction(d)
+        if self._ai_dir is not None:
+            game.set_direction(self._ai_dir)
+            self._ai_dir = None
+            return
+        if self._ai_pending is None:
+            self._ai_pending = Clock.schedule_once(self._compute_ai, 0.0)
+        if self._ai_cached is not None:
+            game.set_direction(self._ai_cached)
+            self._ai_cached = None
+
+    def _compute_ai(self, _dt: float) -> None:
+        self._ai_pending = None
+        if self.session is None or self.game.state != "running":
+            return
+        self._ai_counter += 1
+        if self._ai_counter % max(1, self.ai_period) != 0:
+            return
+        self._ai_cached = self.session.tick(
+            self.game.world, self.game.snake, self.game.wrap_mode, speed=self.speed
+        )
 
     def _update_chunks(self) -> None:
         vp = self.canvas_widget.viewport

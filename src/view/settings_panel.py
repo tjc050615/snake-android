@@ -56,6 +56,7 @@ LABEL_KEY = {
     "bg_mode": "bg",
     "bg_index": "bg_index",
     "view_scale": "view_scale",
+    "fps_cap": "fps_cap",
 }
 
 
@@ -125,6 +126,22 @@ class SettingsOverlay(ThemedMixin, BoxLayout):
         s.bind(value=lambda _w, v, k=key: self._set(k, round(float(v), 2)))
         row.add_widget(s)
 
+    def _zoom_row(self) -> None:
+        """广角档位：1x / 1.5x / 2x / 2.5x / 4x，点击即切换。"""
+        row = self._row("view_scale")
+        box = BoxLayout(spacing=4)
+        current = float(self.cfg.get("view_zoom", 1.0))
+        for value, text in ((1.0, "1x"), (1.5, "1.5x"), (2.0, "2x"), (2.5, "2.5x"), (4.0, "4x")):
+            btn = Button(text=text, font_name=FONT_NAME, font_size=self._fs(12))
+            btn.background_color = (0.25, 0.55, 0.95, 1) if abs(value - current) < 1e-6 else (0.22, 0.24, 0.29, 1)
+            btn.bind(on_release=lambda _w, v=value: self._set_zoom(v))
+            box.add_widget(btn)
+        row.add_widget(box)
+
+    def _set_zoom(self, value: float) -> None:
+        self.cfg["view_zoom"] = float(value)
+        self._emit()
+
     def _screen_awake_row(self) -> None:
         """屏幕常亮：状态存 profile（不是 config），实际效果 M5 用 pyjnius。"""
         row = self._row("screen_awake")
@@ -167,7 +184,8 @@ class SettingsOverlay(ThemedMixin, BoxLayout):
         )
         self._choice_row("bg_mode", ("solid", "gradient"),
                          {"solid": strings.t("bg_solid"), "gradient": strings.t("bg_gradient")})
-        self._slider_row("view_scale", 0.6, 2.0)
+        self._zoom_row()
+        self._choice_row("fps_cap", (60, 90, 120), {60: "60", 90: "90", 120: "120"})
         names = GRADIENT_NAMES if self.cfg.get("bg_mode") == "gradient" else SOLID_NAMES
         self._choice_row("bg_index", tuple(range(16)), {i: names[i] for i in range(16)})
         self._switch_row("show_fps")
