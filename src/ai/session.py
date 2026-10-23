@@ -104,19 +104,7 @@ class AISession:
         self._cheap_ticks = 0
         self._follow_cheap = False
 
-        # 路径复用：上一条路径仍可走就继续走，不重算
         reuse_dir = None
-        while self._plan and self._plan[0] == snake.head:
-            self._plan.pop(0)
-        if self._plan:
-            step = self._plan[0]
-            d = (step[0] - snake.head[0], step[1] - snake.head[1])
-            if (abs(d[0]) + abs(d[1]) == 1
-                    and world.has_food(self._plan[-1])
-                    and self.controller.safe_step(world, snake, d, wrap_mode)):
-                reuse_dir = d
-                self._plan.pop(0)
-                self.stats["path_reuse"] = self.stats.get("path_reuse", 0) + 1
 
         # 高速档：每 2 tick 决策一次；其余每 tick
         if self.ticks % self.period == 0:

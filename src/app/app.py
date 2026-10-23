@@ -493,6 +493,7 @@ class SnakeApp(App):
 
     def _cycle_speed(self, value: float | None = None) -> None:
         self.speed = float(value) if value is not None else self.speed
+        speed = min(speed, 4.0)
         self.game.clock.set_speed(self.speed)
         self._apply_chunk_throughput()
         self.panel.speed = self.speed

@@ -78,7 +78,7 @@ class Panel(ThemedMixin, BoxLayout):
         self.btn_ai.bind(on_release=lambda *_: self._ai())
         self.speed_row = BoxLayout(size_hint_y=None, height=56, spacing=4)
         self.speed_buttons = {}
-        for _v in (1.0, 2.0, 4.0, 8.0, 16.0):
+        for _v in (1.0, 2.0, 4.0):
             b = Button(text=f"{_v:g}x", font_name=FONT_NAME, font_size=14.0)
             b.bind(on_release=lambda _w, v=_v: self._set_speed(v))
             self.speed_row.add_widget(b)
@@ -141,6 +141,12 @@ class Panel(ThemedMixin, BoxLayout):
     def _speed(self) -> None:
         if self._on_speed is not None:
             self._on_speed()
+        self.refresh()
+
+    def _set_speed(self, value: float) -> None:
+        self._tap()
+        if self._on_speed is not None:
+            self._on_speed(value)
         self.refresh()
 
     def _stats(self) -> None:
