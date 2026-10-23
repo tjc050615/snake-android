@@ -1010,7 +1010,7 @@ class SnakeApp(App):
         print("[SMOKE] window        =", f"{Window.width:.0f}x{Window.height:.0f}", "px")
         print("[SMOKE] density       =", Metrics.density)
         print("[SMOKE] grid_size     =", m["grid_size"])
-        print("[SMOKE] viewport cells=", f"{m['cols']}x{m['rows']}", "(>=21:", not m["too_small"], ")")
+        print("[SMOKE] viewport cells=", f"{m.get('cols')}x{m.get('rows')}", "(>=21:", not m["too_small"], ")")
         print("[SMOKE] too_small     =", m["too_small"])
         print("[SMOKE] speed         =", f"{self.speed}x (interval {self.game.clock.interval*1000:.1f}ms)")
         print("[SMOKE] chunks        =", len(self.game.world._chunks))  # noqa: SLF001
@@ -1019,7 +1019,7 @@ class SnakeApp(App):
         print("[SMOKE] snake         =", f"len={len(self.game.snake)} head={self.game.snake.head} dir={self.game.snake.direction}")
         print("[SMOKE] state/ticks   =", self.game.state, "ticks=", self.game.ticks)
         print("[SMOKE] camera        =", f"cur={m.get('cam_current')} tgt={m.get('cam_target')} armed={m.get('cam_armed')}")
-        print("[SMOKE] head_screen   =", f"{tuple(round(v, 1) for v in m['head_screen'])} inside={m['head_inside']}")
+        print("[SMOKE] head_screen   =", f"{tuple(round(v, 1) for v in m.get('head_screen'))} inside={m.get('head_inside')}")
         print("[SMOKE] seed          =", self.game.seed)
         print("[SMOKE] exit scheduled=", self.smoke_seconds, "s")
 
@@ -1032,8 +1032,8 @@ class SnakeApp(App):
         print("[SMOKE] eaten(foods)  =", f"{self._foods0} -> {self.game.world.food_count()}, eaten={self.game.score}")
         print("[SMOKE] snake         =", f"len={len(self.game.snake)} head={self.game.snake.head}")
         print("[SMOKE] camera        =", f"cur={m.get('cam_current')} tgt={m.get('cam_target')} armed={m.get('cam_armed')}")
-        print("[SMOKE] head_screen   =", f"{tuple(round(v, 1) for v in m['head_screen'])} inside={m['head_inside']}")
-        print("[SMOKE] progress      =", f"{m['progress']:.3f}")
+        print("[SMOKE] head_screen   =", f"{tuple(round(v, 1) for v in m.get('head_screen'))} inside={m.get('head_inside')}")
+        print("[SMOKE] progress      =", f"{m.get('progress'):.3f}")
         print("[SMOKE] chunks_loaded =", len(self.game.world.loaded_chunks()))
         try:
             b = self.panel.btn_wrap
