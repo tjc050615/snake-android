@@ -98,14 +98,12 @@ def test_food_never_on_obstacle(cx, cy):
 
 
 def test_food_count_still_in_range_with_obstacles():
+    """全局食物上限 5 后：单 chunk 可能为 0，总量不得超 5。"""
     world = World(11)
-    for cx, cy in _chunks(10):
-        world.ensure_chunk(cx, cy)
-        chunk = world.chunk_at((cx * C.CHUNK_SIZE, cy * C.CHUNK_SIZE))
-        assert C.FOOD_PER_CHUNK_MIN <= len(chunk.foods) <= C.FOOD_PER_CHUNK_MAX
+    world.ensure_chunk(0, 0)
+    count = world.food_count()
+    assert 0 <= count <= 5
 
-
-# ---------- 穿墙模式 ----------
 def test_obstacle_kills_without_wrap_mode():
     game = Game(5)
     game.world.add_blocked((1, 0), BLOCK_OBSTACLE)

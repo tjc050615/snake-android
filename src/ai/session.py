@@ -71,7 +71,11 @@ class AISession:
     def tick(self, world, snake, wrap_mode: bool = False, speed: float = 1.0,
              budget_s: float | None = None) -> tuple[int, int] | None:
         self.ticks += 1
-        prev_len = len(snake)
+        if getattr(self, "_last_len", None) is None:
+            self._last_len = len(snake)
+        elif len(snake) > self._last_len:
+            self.stats["eaten"] += len(snake) - self._last_len
+        self._last_len = len(snake)
         high = speed >= HIGH_SPEED
         self.period = 2 if high else 1
         # 留 1ms 余量给 Python 调度抖动，保证总耗时 p99 < 8ms
@@ -120,8 +124,6 @@ class AISession:
         if direction is not None:
             self.last_direction = direction
 
-        if len(snake) > prev_len:
-            self.stats["eaten"] += len(snake) - prev_len
         self.stats["alive_ticks"] = self.ticks
         if self.ticks % self.stats_log_every == 0:
             self._log_stats()
