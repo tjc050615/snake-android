@@ -118,6 +118,11 @@ class AISession:
 
     def _compute(self, world, snake, wrap_mode: bool) -> None:
         t0 = __import__("time").perf_counter()
+        # 动态搜索深度：短蛇贪心、长蛇深搜
+        if len(snake) < 30:
+            self.controller.max_nodes = getattr(self, "max_nodes_small", 300)
+        else:
+            self.controller.max_nodes = getattr(self, "max_nodes_large", 400)
         deadline = None if self.deterministic else t0 + self.timeout_s
         self.controller.plan(world, snake, wrap_mode, deadline=deadline)
         cost_ms = (__import__("time").perf_counter() - t0) * 1000.0

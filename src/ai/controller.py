@@ -22,7 +22,7 @@ STATE_DEAD = "DEAD"
 # 确定性降级顺序：上 → 右 → 下 → 左（D-018）
 FALLBACK_DIRS = ((0, 1), (1, 0), (0, -1), (-1, 0))
 MAX_FOOD_CANDIDATES = 12
-EMERGENCY_FACTOR = 1.5   # 剩余空间 < 蛇长 × 系数 → 紧急保底   # R5C：扩大候选，避免只盯最近 4 个
+EMERGENCY_FACTOR = 1.5   # 保留常量（当前未用）   # R5C：扩大候选，避免只盯最近 4 个
 LOOP_WINDOW = 20
 LOOP_THRESHOLD = 3
 
@@ -44,6 +44,9 @@ class AIController:
         self.state = STATE_IDLE
         self.path: list[tuple[int, int]] = []
         self.recent_heads: deque[tuple[int, int]] = deque(maxlen=LOOP_WINDOW)
+        self.flood_limit = 40
+        self.margin_small = 2
+        self.margin_large = 8
         self.radius_cap = 80  # 高速档由会话改成 40（D-040）
         self._nudge_offset = 0
         self.stats = {
@@ -97,7 +100,7 @@ class AIController:
         # R5C 紧急保底：剩余空间 < 蛇长时，立刻改走「最大连通空间」方向
         if self.stats["plans"] % 1 == 0:
             area = self._flood_area(world, snake, head, wrap_mode)
-            margin = 2 if len(snake) < 50 else 8
+            margin = self.margin_small if len(snake) < 50 else self.margin_large
             if len(snake) >= 20 and area < len(snake) + margin:
                 path = self._space_best_step(world, snake, wrap_mode, rect, deadline=deadline)
                 if path:
@@ -144,8 +147,9 @@ class AIController:
 
 
     # ---------- 空间评估（R5C） ----------
-    def _flood_area(self, world, snake, start, wrap_mode: bool, limit: int = 120) -> int:
-        """从 start 出发的连通可通行格数（蛇身视为墙，尾巴格可走）。"""
+    def _flood_area(self, world, snake, start, wrap_mode: bool, limit: int | None = None) -> int:
+        limit = self.flood_limit if limit is None else limit
+        # 从 start 出发的连通可通行格数（蛇身视为墙，尾巴格可走）
         body = set(snake.body)
         body.discard(snake.tail)
         seen = {start}
