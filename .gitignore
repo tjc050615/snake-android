@@ -11,3 +11,8 @@ bin/
 .buildozer/
 apk-contents.txt
 buildozer-debug.log
+
+.buildozer/
+docs/evidence/
+bin/
+*.apk
