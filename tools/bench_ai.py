@@ -6,7 +6,7 @@ from core.chunk_manager import ChunkManager
 from core.game import Game
 
 SPEED = 16.0
-MAX_TICKS = 6000
+MAX_TICKS = 7000
 VIEW = 28
 SEED = 20261022
 

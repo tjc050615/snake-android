@@ -98,7 +98,7 @@ class AIController:
         if self.stats["plans"] % 1 == 0:
             area = self._flood_area(world, snake, head, wrap_mode)
             margin = 2 if len(snake) < 50 else 8
-            if len(snake) >= 10 and area < len(snake) + margin:
+            if len(snake) >= 20 and area < len(snake) + margin:
                 path = self._space_best_step(world, snake, wrap_mode, rect, deadline=deadline)
                 if path:
                     self.state = "EMERGENCY"
@@ -144,7 +144,7 @@ class AIController:
 
 
     # ---------- 空间评估（R5C） ----------
-    def _flood_area(self, world, snake, start, wrap_mode: bool, limit: int = 300) -> int:
+    def _flood_area(self, world, snake, start, wrap_mode: bool, limit: int = 100) -> int:
         """从 start 出发的连通可通行格数（蛇身视为墙，尾巴格可走）。"""
         body = set(snake.body)
         body.discard(snake.tail)
@@ -193,6 +193,11 @@ class AIController:
 
         path = astar(snake.head, tail, passable_tail, rect, pool=self.pool,
                      max_nodes=self.max_nodes, deadline=deadline)
+        # 短蛇不需要洪泛（性能）；长蛇才做空间比较
+        if len(snake) < 70:
+            self.path = path
+            self.stats.update(state=self.state, path_len=len(path))
+            return path
         # R5C 升级：追尾时也做一次轻量洪水填充，选空间更大的岔路
         tail_step = path[0] if path else None
         best, best_area = None, -1
