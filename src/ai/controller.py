@@ -46,7 +46,10 @@ class AIController:
         self.recent_heads: deque[tuple[int, int]] = deque(maxlen=LOOP_WINDOW)
         self.flood_limit = 40
         self._follow_streak = 0   # 连续跟尾 tick 数
-        self._bad_food = {}       # 食物 -> 过期 plan 计数（幽灵食物标记）
+        self._bad_food = {}
+        self._area_cache = None
+        self._hunger = 0
+        self._last_body_len = 0       # 食物 -> 过期 plan 计数（幽灵食物标记）
         self.margin_small = 2
         self.margin_large = 8
         self.radius_cap = 80  # 高速档由会话改成 40（D-040）
@@ -85,6 +88,11 @@ class AIController:
     # ---------- 规划 ----------
     def plan(self, world, snake, wrap_mode: bool = False, deadline=None):
         head = snake.head
+        if len(snake) > self._last_body_len:
+            self._hunger = 0          # 吃到食物，重置饥饿
+        else:
+            self._hunger += 1
+        self._last_body_len = len(snake)
         self.recent_heads.append(head)
         rect = self.rect_for(head, len(snake), world)
         x0, y0, x1, y1 = rect
@@ -99,17 +107,15 @@ class AIController:
 
         self.stats["plans"] += 1
 
-        # R5C 紧急保底：剩余空间 < 蛇长时，立刻改走「最大连通空间」方向
-        if self.stats["plans"] % 1 == 0:
+        # 紧急保底：面积不足才逃命（上限随蛇长，_flood_area 有 5 次缓存）
+        if len(snake) >= 20:
             area = self._flood_area(world, snake, head, wrap_mode,
-                                    limit=140)  # 必须足够大，否则长蛇永远误判空间不足
-            margin = self.margin_small if len(snake) < 50 else self.margin_large
-            if len(snake) >= 20 and area < len(snake) + margin:
+                                    limit=min(len(snake) + 40, 220))
+            if area < len(snake) + 6:
                 path = self._space_best_step(world, snake, wrap_mode, rect, deadline=deadline)
                 if path:
                     self.state = "EMERGENCY"
                     self.stats["emergency"] = self.stats.get("emergency", 0) + 1
-                    self.stats.update(state=self.state, path_len=1)
                     return path
 
         # 防循环：最近 20 步里蛇头重复 ≥3 次 → 强制跟尾 + 微调
@@ -120,8 +126,10 @@ class AIController:
             self.recent_heads.clear()
             return self._follow_tail(snake, rect, passable, deadline=deadline, world=world, wrap_mode=wrap_mode)
 
+        max_food_dist = 25 if len(snake) > 100 else 10 ** 9
         foods = sorted(
-            (c for c in world.foods_in_rect(*rect) if in_rect(c)),
+            (c for c in world.foods_in_rect(*rect)
+             if in_rect(c) and manhattan(c, head) <= max_food_dist),
             key=lambda c: (manhattan(head, c), c[0], c[1]),
         )
         if not foods:   # 视野内没有 → 全图找最近的，绝不放空
@@ -135,7 +143,7 @@ class AIController:
             if not safety.level1_reachable(world, snake, food, wrap_mode, deadline=deadline):
                 self.stats["blocked_l1"] += 1
                 continue
-            if not safety.level2_ok(world, snake, food, wrap_mode, deadline=deadline):
+            if len(snake) <= 100 and not safety.level2_ok(world, snake, food, wrap_mode, deadline=deadline):
                 self.stats["blocked_l2"] += 1
                 continue
 
@@ -148,6 +156,23 @@ class AIController:
                 return path
             # A* 空路径不代表其它食物不可达：继续尝试下一个候选
             continue
+
+        # 饥饿保护：连续 30 tick 没吃到 → 强制去最近食物（只校验 level1）
+        if self._hunger > 30:
+            all_foods = sorted(world.foods(),
+                               key=lambda c: (manhattan(head, c), c[0], c[1]))
+            for cand in all_foods[:8]:
+                if deadline is not None and time.perf_counter() > deadline:
+                    break
+                if not safety.level1_reachable(world, snake, cand, wrap_mode, deadline=deadline):
+                    continue
+                path = astar(head, cand, passable, rect, pool=self.pool,
+                             max_nodes=self.max_nodes, deadline=deadline)
+                if path:
+                    self.path = path
+                    self.state = STATE_SEEKING_FOOD
+                    self.stats["hungry_feed"] = self.stats.get("hungry_feed", 0) + 1
+                    return path
 
         # 摆烂保护：连续跟尾 >100 tick，强制尝试最近食物（level1 安全即可）
         if self._follow_streak > 100 and foods and (deadline is None or time.perf_counter() < deadline):
@@ -167,6 +192,11 @@ class AIController:
 
     # ---------- 空间评估（R5C） ----------
     def _flood_area(self, world, snake, start, wrap_mode: bool, limit: int | None = None) -> int:
+        key = (start, len(snake))
+        cache = self._area_cache
+        if cache and cache[0] == key and self.stats["plans"] - cache[2] < 5:
+            return cache[1]   # 5 次规划内复用，避免长蛇反复全量扫描
+        limit = min(limit if limit is not None else self.flood_limit, 50)
         limit = self.flood_limit if limit is None else limit
         # 从 start 出发的连通可通行格数（蛇身视为墙，尾巴格可走）
         body = set(snake.body)
@@ -183,6 +213,7 @@ class AIController:
                     continue
                 seen.add(n)
                 q.append(n)
+        self._area_cache = (key, len(seen), self.stats["plans"])
         return len(seen)
 
     def _space_best_step(self, world, snake, wrap_mode: bool, rect, deadline=None):

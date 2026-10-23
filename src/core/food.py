@@ -52,6 +52,11 @@ def reroll_foods(world, snake, rng: random.Random) -> None:
         world.add_food(cell)
 
 
+def food_cap(snake_len: int) -> int:
+    """食物上限随蛇长激进提升：基础 5，每 20 节 +1，最多 30。"""
+    return min(30, 5 + max(0, int(snake_len) // 20))
+
+
 def ensure_local_food(world, snake, rng: random.Random, radius: int = 10):
     """保证蛇头附近有食物：直接在头周围窗口里找空格（不依赖 chunk 遍历顺序）。
 
@@ -65,8 +70,9 @@ def ensure_local_food(world, snake, rng: random.Random, radius: int = 10):
 
     if near_count(radius) >= 2:
         return None
-    if world.food_count() >= 5:
-        # 满 5 个但都不在附近：把最远的挪到蛇头附近，保证"看得见食物"
+    cap = food_cap(len(snake))
+    if world.food_count() >= cap:
+        # 满了但都不在附近：把最远的挪到蛇头附近，保证"看得见食物"
         far = sorted(world.foods(),
                      key=lambda c: -(abs(c[0] - hx) + abs(c[1] - hy)))
         if far and abs(far[0][0] - hx) + abs(far[0][1] - hy) > radius:
