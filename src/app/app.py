@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import os
+import random
 
 import kivy
 from kivy.app import App
@@ -168,7 +169,9 @@ class SnakeApp(App):
             self.cfg["bg_index"] = self.bgindex_override
         if self.viewscale_override is not None:
             self.cfg["view_zoom"] = self.viewscale_override
-        self.game = Game(DEFAULT_SEED, obstacles=C.OBSTACLES_ENABLED)
+        seed = (DEFAULT_SEED if getattr(self, "smoke_seconds", 0) > 0 or self.demo
+                else random.SystemRandom().randrange(1, 2 ** 31))
+        self.game = Game(seed, obstacles=C.OBSTACLES_ENABLED)
         self.recorder = Recorder(self.game.seed, 'human')
         self.game.clock.set_speed(self.speed)
         self._foods0 = self.game.world.food_count()

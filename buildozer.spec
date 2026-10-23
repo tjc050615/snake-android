@@ -1,5 +1,5 @@
 [app]
-version = 0.1
+version = 0.2
 title = Snake Android
 package.name = snake
 package.domain = org.example
@@ -17,6 +17,8 @@ requirements = python3==3.11.15,hostpython3==3.11.15,kivy==2.3.0,pyjnius,cython=
 #   python-for-android: pin 到 buildozer 1.5.0 兼容的 commit（见 docs/R4-PACKAGING.md）
 #   Python 3.11（Kivy 2.3.0 支持 3.8~3.12）
 
+# 图标/启动图：使用 buildozer 默认占位，若提供 assets/icon.png 再取消下行注释
+# icon.filename = %(source.dir)s/assets/icon.png
 orientation = landscape
 fullscreen = 1
 android.minapi = 23
