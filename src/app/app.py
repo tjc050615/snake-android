@@ -777,7 +777,8 @@ class SnakeApp(App):
         if summary.died:
             self.haptics.vibrate_ms(300)
         if self.session is not None:
-            self.canvas_widget.ai_path = self.session.current_path(self.game.ticks)
+            # 直接画最近一次规划路径（current_path 的 tick 对齐会经常为空）
+            self.canvas_widget.ai_path = list(self.session.path)
         if (
             self.game.state == "running"
             or summary.ticks

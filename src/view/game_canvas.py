@@ -235,21 +235,19 @@ class GameCanvas(Widget):
                     rx, ry, w, h = vp.cell_rect(cell)
                     Rectangle(pos=(rx + 1, ry + 1), size=(w - 2, h - 2))
 
-            # AI 路径：画在蛇身下层、半透明浅蓝（R3）；只画视口内的连续段（R4 裁剪）
+            # AI 路径：隔格画小圆点（虚线效果），无 dash 兼容性问题
             if self.ai_path:
-                Color(*self.colors['path'])
-                run: list[float] = []
-                for cell in self.ai_path:
-                    visible = vp.covers(cell)
-                    if not visible:
-                        if len(run) >= 4:
-                            Line(points=run, width=2)
-                        run = []
+                path_color = self.colors.get("path", (0.45, 0.75, 1.0, 0.35))
+                Color(path_color[0], path_color[1], path_color[2], min(0.75, path_color[3] + 0.25))
+                dot = max(2.0, g * 0.16)
+                for idx, cell in enumerate(self.ai_path):
+                    if idx % 2:          # 隔一格，形成虚线节奏
                         continue
-                    px, py = to_pixel((float(cell[0]), float(cell[1])), g, vp.origin_x, vp.origin_y)
-                    run.extend((px, py))
-                if len(run) >= 4:
-                    Line(points=run, width=2)
+                    if not vp.covers(cell):
+                        continue
+                    px, py = to_pixel((float(cell[0]), float(cell[1])), g,
+                                      vp.origin_x, vp.origin_y)
+                    Ellipse(pos=(px - dot / 2, py - dot / 2), size=(dot, dot))
 
             # 蛇身：浮点格坐标 → 像素，矩形以格中心为锚点
             cells = segment_cells(self.game.snake, self.game.tick_progress, self._cells_buf)
